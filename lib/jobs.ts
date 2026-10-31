@@ -13,7 +13,7 @@ import { parseSubject } from "./subject";
 
 export async function ingestGraphMessage(m: GraphMessage): Promise<IngestResult | null> {
   const settings = await getSettings();
-  const p = parseSubject(m.subject || "", settings.subjectKeywords);
+  const p = parseSubject(m.subject || "", settings.subjectKeywords, settings.workflows);
   const thread = m.conversationId ? `conv:${m.conversationId}` : null;
   if (!p.matched && !p.code && !(await isKnownThread(thread))) return null;
   const files = m.hasAttachments ? await getAttachments(m.id) : [];
@@ -56,7 +56,7 @@ export async function runDaily() {
     const ins = insight(d, settings);
     if (ins.slaState !== "breach") continue;
     breaches++;
-    const st = stageDef(d.doc_type, d.stage);
+    const st = stageDef(settings.workflows, d.doc_type, d.stage);
     const link = `${appUrl()}/documents/${d.id}`;
     const over = Math.max(0, ins.slaUsed - ins.slaDays);
 
@@ -91,7 +91,7 @@ export async function runDaily() {
     const scored = docs.map((d) => ({ d, i: insight(d, settings) })).sort((a, b) => b.i.score - a.i.score);
     for (const m of members) {
       const mine = scored.filter(({ d }) => {
-        const st = stageDef(d.doc_type, d.stage);
+        const st = stageDef(settings.workflows, d.doc_type, d.stage);
         if (m.role === "staff") return d.assignee_id === m.id;
         if (st?.approval) return st.role === m.role;
         return m.role === "manager" || m.role === "admin";

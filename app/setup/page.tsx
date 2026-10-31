@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export default function SetupPage() {
   const steps = [
     { ok: hasDb(), title: "Hubungkan database", body: "Di Vercel: project ini → Storage → Create Database → Neon → Connect (centang Production), lalu redeploy." },
-    { ok: Boolean(process.env.ACCESS_CODE), title: "Atur kode akses tim", body: "Isi ACCESS_CODE dan AUTH_SECRET di Settings → Environment Variables." },
+    { ok: Boolean(process.env.AUTH_SECRET), title: "Atur kunci sesi", body: "Isi AUTH_SECRET (string acak panjang) di Settings → Environment Variables." },
   ];
   const ready = steps.every((s) => s.ok);
   return (

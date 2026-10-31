@@ -7,7 +7,7 @@ export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
   const me = await currentMember();
-  if (!me) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!me || me.must_change_password) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const form = await req.formData();
   const files = form.getAll("files").filter((f): f is File => f instanceof File);
   const results = [];

@@ -16,6 +16,7 @@ export interface DocRow {
   deadline: string | Date | null;
   urgent: boolean;
   risk_level: RiskLevel;
+  skip_stages?: string[];
   require_cpo: boolean | null;
   stage: string;
   status: DocStatus;
@@ -74,13 +75,13 @@ export const deadlineStr = (d: DocRow) =>
 const wibIso = (d: Date) => new Date(+d + 7 * 3600_000).toISOString().slice(0, 10);
 
 export function stageCtx(d: DocRow, s: AppSettings) {
-  return { contractValue: value(d), riskLevel: d.risk_level, requireCpo: d.require_cpo, cpoThreshold: s.cpoThreshold };
+  return { contractValue: value(d), riskLevel: d.risk_level, requireCpo: d.require_cpo, cpoThreshold: s.cpoThreshold, skip: d.skip_stages ?? [] };
 }
 
 export function insight(d: DocRow, s: AppSettings, now = Date.now()): Insight {
   const holidays = new Set(s.holidays);
-  const stages = stagesFor(d.doc_type, stageCtx(d, s));
-  const stage = stageDef(d.doc_type, d.stage);
+  const stages = stagesFor(s.workflows, d.doc_type, stageCtx(d, s), d.stage);
+  const stage = stageDef(s.workflows, d.doc_type, d.stage);
   const stageIndex = stages.findIndex((x) => x.key === d.stage);
   const closed = d.status === "done" || d.status === "cancelled";
   const paused = d.status === "on_hold";

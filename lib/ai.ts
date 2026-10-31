@@ -2,7 +2,7 @@
 import { generateText, type FilePart, type TextPart } from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { z } from "zod";
-import { WORKFLOWS, type DocType } from "./workflow";
+import { typeDef, type DocType, type Workflows } from "./workflow";
 
 export const aiEnabled = () =>
   process.env.AI_DISABLED !== "true" &&
@@ -19,7 +19,7 @@ export interface FileInput { name: string; contentType: string; data: Uint8Array
 
 const Extract = z.object({
   title: z.string().min(1).max(200),
-  doc_type: z.enum(["vendor", "principal", "other"]),
+  doc_type: z.string(),
   counterparty: z.string().nullable(),
   contract_value: z.number().nullable(),
   currency: z.string().nullable(),
@@ -73,14 +73,14 @@ function parseJson<T>(text: string, schema: z.ZodType<T>): T {
   return schema.parse(JSON.parse(text.slice(start, end + 1)));
 }
 
-export async function extractFromEmail(email: { subject: string; from: string; body: string; receivedAt: string }, files: FileInput[]): Promise<Extraction> {
+export async function extractFromEmail(email: { subject: string; from: string; body: string; receivedAt: string }, files: FileInput[], wf: Workflows): Promise<Extraction> {
   const today = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
   const prompt = `Kamu asisten tim Legal di sebuah grup perusahaan F&B di Indonesia. Dari email dan lampiran berikut, ekstrak data dokumen legal.
 Tanggal hari ini (WIB): ${today}.
 
 Balas HANYA dengan satu objek JSON, tanpa teks lain, dengan field:
 - title: nama dokumen singkat & jelas dalam Bahasa Indonesia (mis. "Perjanjian Supply Ayam 2027")
-- doc_type: "vendor" (pemasok/penyedia jasa), "principal" (prinsipal/pemilik merek/lisensi/distribusi/franchise), atau "other"
+- doc_type: salah satu dari ${wf.map((t) => `"${t.key}" (${t.label})`).join(", ")}. Vendor = pemasok/penyedia jasa; prinsipal = pemilik merek/lisensi/distribusi/franchise.
 - counterparty: nama badan hukum pihak lawan, atau null
 - contract_value: nilai kontrak total dalam angka (tanpa titik/koma), atau null jika tidak disebut
 - currency: kode mata uang (IDR, USD, SGD, ...) atau null
@@ -108,9 +108,10 @@ ${email.body.slice(0, 20_000)}`;
 
 export async function suggestUpdate(
   doc: { title: string; doc_type: DocType; stage: string; status: string },
+  wf: Workflows,
   email: { subject: string; from: string; body: string },
 ): Promise<UpdateSuggestion> {
-  const stages = WORKFLOWS[doc.doc_type].map((s) => `${s.key} = ${s.label}`).join("\n");
+  const stages = typeDef(wf, doc.doc_type).stages.map((s) => `${s.key} = ${s.label}`).join("\n");
   const prompt = `Dokumen legal "${doc.title}" sedang di tahap "${doc.stage}" (status ${doc.status}).
 Tahapan yang tersedia:
 ${stages}

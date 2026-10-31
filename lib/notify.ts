@@ -1,5 +1,5 @@
 // Email (Microsoft Graph or Resend) and WhatsApp (Fonnte or Meta Cloud API) notifications.
-import { query } from "./db";
+import { getSettings, query } from "./db";
 import { graphConfigured, sendMail } from "./graph";
 import type { Member } from "./repo";
 
@@ -80,9 +80,23 @@ async function sendWa(to: string, m: Message) {
 export async function notify(members: Member[], m: Message): Promise<number> {
   let sent = 0;
   const targets: { channel: "email" | "whatsapp"; to: string }[] = [];
-  for (const mem of members) {
-    if (mem.email && emailChannel()) targets.push({ channel: "email", to: mem.email });
-    if (mem.whatsapp && waChannel()) targets.push({ channel: "whatsapp", to: mem.whatsapp });
+  const settings = await getSettings();
+  if (settings.uatMode) {
+    // UAT: never reach real people. Everything goes to the tester's inbox, WhatsApp is skipped.
+    const to = settings.uatRecipient.trim();
+    if (!to || !emailChannel() || members.length === 0) return 0;
+    m = {
+      ...m,
+      subject: `[UAT] ${m.subject}`,
+      lines: [...m.lines, `(Mode UAT: aslinya untuk ${members.map((x) => x.name).join(", ")})`],
+      dedupeKey: m.dedupeKey ? `uat:${m.dedupeKey}:${members.map((x) => x.id).join(",")}` : undefined,
+    };
+    targets.push({ channel: "email", to });
+  } else {
+    for (const mem of members) {
+      if (mem.email && emailChannel()) targets.push({ channel: "email", to: mem.email });
+      if (mem.whatsapp && waChannel()) targets.push({ channel: "whatsapp", to: mem.whatsapp });
+    }
   }
   for (const t of targets) {
     const key = m.dedupeKey ? `${m.dedupeKey}:${t.channel}:${t.to}` : null;

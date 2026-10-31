@@ -12,6 +12,10 @@ export interface Member {
   whatsapp: string | null;
   active: boolean;
   title?: string | null;
+  nik?: string | null;
+  must_change_password?: boolean;
+  has_password?: boolean;
+  last_login_at?: string | Date | null;
 }
 
 export interface EventRow {
@@ -49,7 +53,7 @@ export interface AttachmentRow {
 }
 
 const DOC_COLUMNS = `d.id, d.code, d.title, d.doc_type, d.counterparty, d.contract_value, d.currency,
-  to_char(d.deadline, 'YYYY-MM-DD') as deadline, d.urgent, d.risk_level, d.require_cpo, d.stage, d.status, d.hold_reason,
+  to_char(d.deadline, 'YYYY-MM-DD') as deadline, d.urgent, d.risk_level, d.skip_stages, d.require_cpo, d.stage, d.status, d.hold_reason,
   d.assignee_id, m.name as assignee_name, d.requester_name, d.requester_email, d.summary, d.key_points, d.ai_suggestion,
   d.source, d.stage_entered_at, d.hold_started_at, d.paused_ms, d.last_activity_at, d.completed_at, d.is_demo, d.created_at`;
 
@@ -90,12 +94,12 @@ export async function listAttachments(docId: number) {
 }
 
 export async function listMembers(activeOnly = false) {
-  return query<Member>(`select id, name, role, email, whatsapp, active, title from team_members ${activeOnly ? "where active" : ""} order by
+  return query<Member>(`select id, name, role, email, whatsapp, active, title, nik, must_change_password, password_hash is not null as has_password, last_login_at from team_members ${activeOnly ? "where active" : ""} order by
     case role when 'staff' then 1 when 'manager' then 2 when 'agm' then 3 when 'cpo' then 4 else 5 end, name`);
 }
 
 export async function getMember(id: number) {
-  return one<Member>(`select id, name, role, email, whatsapp, active, title from team_members where id = $1`, [id]);
+  return one<Member>(`select id, name, role, email, whatsapp, active, title, nik, must_change_password, password_hash is not null as has_password, last_login_at from team_members where id = $1`, [id]);
 }
 
 export async function logEvent(docId: number, e: { type: string; actor?: string | null; from?: string | null; to?: string | null; message?: string | null; meta?: unknown }) {
@@ -130,8 +134,15 @@ export async function currentMember(): Promise<Member | null> {
   return m && m.active ? m : null;
 }
 
+export const canBypassMaintenance = (m: Member) => ["manager", "agm", "admin"].includes(m.role);
+
+/** Signed-in member allowed to change data (blocks first-login and maintenance). */
 export async function requireMember(): Promise<Member> {
   const m = await currentMember();
   if (!m) throw new Error("Sesi berakhir, silakan masuk lagi.");
+  if (m.must_change_password) throw new Error("Ganti password Anda terlebih dahulu.");
+  const { getSettings } = await import("./db");
+  const s = await getSettings();
+  if (s.maintenance && !canBypassMaintenance(m)) throw new Error("Legal Desk sedang maintenance. Coba lagi nanti.");
   return m;
 }

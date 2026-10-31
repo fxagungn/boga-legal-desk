@@ -5,7 +5,7 @@ import { buildJourney, needsMe } from "@/lib/journey";
 import { getDocument, listAttachments, listEvents, listMembers, type Member } from "@/lib/repo";
 import { deadlineText } from "@/lib/labels";
 import { fileSize, money } from "@/lib/format";
-import { DOC_TYPE_LABEL } from "@/lib/workflow";
+import { typeLabel } from "@/lib/workflow";
 import { DocActions } from "./DocActions";
 import { HolderLine, JourneyTimeline } from "./journey";
 import { cx, PriorityChip, StatusChip } from "./ui";
@@ -16,7 +16,7 @@ export async function DocPreview({ id, me, closeHref }: { id: number; me: Member
   if (!doc) return null;
   const [events, files, members] = await Promise.all([listEvents(id), listAttachments(id), listMembers()]);
   const j = buildJourney(doc, [...events].reverse(), members, settings);
-  const mine = needsMe(doc, me);
+  const mine = needsMe(doc, me, settings);
   const pdf = files.find((f) => f.content_type.includes("pdf"));
   const dl = j.ins.daysToDeadline;
 
@@ -27,7 +27,7 @@ export async function DocPreview({ id, me, closeHref }: { id: number; me: Member
         <header className="flex items-start gap-3 border-b border-line px-5 py-4">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2 text-[12.5px] font-semibold text-ink-3">
-              <span>{doc.code}</span><span>·</span><span>{DOC_TYPE_LABEL[doc.doc_type]}</span>
+              <span>{doc.code}</span><span>·</span><span>{typeLabel(settings.workflows, doc.doc_type)}</span>
             </div>
             <h2 className="mt-1 text-[19px] leading-snug font-bold tracking-tight">{doc.title}</h2>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -43,7 +43,7 @@ export async function DocPreview({ id, me, closeHref }: { id: number; me: Member
           <section className={cx("rounded-xl border p-4", mine ? "border-brand-line bg-brand-subtle" : "border-line bg-bg")}>
             <p className={cx("mb-3 text-[13px] font-bold", mine ? "text-brand" : "text-ink-2")}>{mine ? "Giliran Anda" : j.closed ? "Status" : "Sekarang di meja"}</p>
             {!mine && !j.closed && <div className="mb-3"><HolderLine j={j} /></div>}
-            <DocActions doc={doc} j={j} me={me} />
+            <DocActions doc={doc} j={j} me={me} settings={settings} />
           </section>
 
           {doc.ai_suggestion && !j.closed && (

@@ -5,7 +5,7 @@ import { buildJourney, holderLoads, needsMe } from "@/lib/journey";
 import { currentMember, listDocuments, listEventsFor, listMembers } from "@/lib/repo";
 import { days, deadlineText, firstName } from "@/lib/labels";
 import { formatDate, formatShort } from "@/lib/time";
-import { DOC_TYPE_LABEL } from "@/lib/workflow";
+import { typeLabel } from "@/lib/workflow";
 import { HolderLine, MiniJourney } from "@/components/journey";
 import { DocPreview } from "@/components/DocPreview";
 import { Avatar, Card, cx, Empty, Notice, PriorityChip } from "@/components/ui";
@@ -28,7 +28,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<SP>
     .map((doc) => ({ doc, j: buildJourney(doc, events.filter((e) => e.document_id === doc.id), members, settings) }))
     .sort((a, b) => b.j.ins.score - a.j.ins.score);
 
-  const mine = all.filter(({ doc }) => needsMe(doc, me));
+  const mine = all.filter(({ doc }) => needsMe(doc, me, settings));
   const late = all.filter(({ j }) => j.ins.slaState === "breach");
   const waiting = all.filter(({ doc }) => doc.status === "on_hold");
   const loads = holderLoads(all);
@@ -168,7 +168,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<SP>
                       {doc.urgent && <span className="text-[12px] font-bold text-brand">Urgent</span>}
                     </div>
                     <div className="truncate text-[15px] font-bold">{doc.title}</div>
-                    <div className="truncate text-[13px] text-ink-2">{doc.counterparty ?? DOC_TYPE_LABEL[doc.doc_type]}</div>
+                    <div className="truncate text-[13px] text-ink-2">{doc.counterparty ?? typeLabel(settings.workflows, doc.doc_type)}</div>
                   </div>
                   <div className="col-span-2 md:col-span-1"><MiniJourney j={j} /></div>
                   <HolderLine j={j} compact />

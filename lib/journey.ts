@@ -3,7 +3,7 @@ import { workdaysBetween } from "./time";
 import { insight, type DocRow, type Insight } from "./insight";
 import type { AppSettings } from "./db";
 import type { EventRow, Member } from "./repo";
-import { ROLE_LABEL, stageDef, type Role } from "./workflow";
+import { ROLE_LABEL, shortLabel, stageDef, type Role } from "./workflow";
 
 export type StepState = "done" | "current" | "waiting" | "upcoming";
 
@@ -44,18 +44,6 @@ export interface Journey {
   overBy: number;
   closed: boolean;
 }
-
-const SHORT: Record<string, string> = {
-  intake: "Diterima",
-  due_diligence: "Due diligence",
-  review: "Review",
-  negotiation: "Negosiasi",
-  mgr_approval: "Manager",
-  agm_approval: "AGM",
-  cpo_approval: "CPLO",
-  signing: "Tanda tangan",
-  archive: "Arsip",
-};
 
 const TRANSITIONS = new Set(["stage", "approved", "revision", "moved"]);
 
@@ -104,7 +92,7 @@ export function buildJourney(doc: DocRow, events: EventRow[], members: Member[],
     return {
       key: st.key,
       label: st.label,
-      short: SHORT[st.key] ?? st.label,
+      short: shortLabel(st),
       role: st.role,
       approval: Boolean(st.approval),
       owner: owner.name,
@@ -141,9 +129,9 @@ export function buildJourney(doc: DocRow, events: EventRow[], members: Member[],
 }
 
 /** Does this member need to act on the document right now? */
-export function needsMe(doc: DocRow, me: Member): boolean {
+export function needsMe(doc: DocRow, me: Member, s: AppSettings): boolean {
   if (doc.status !== "active") return false;
-  const st = stageDef(doc.doc_type, doc.stage);
+  const st = stageDef(s.workflows, doc.doc_type, doc.stage);
   if (!st) return false;
   if (st.approval) return me.role === st.role;
   if (doc.assignee_id === me.id) return true;

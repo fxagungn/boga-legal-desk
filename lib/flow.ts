@@ -4,9 +4,10 @@ import { stageCtx, type DocRow } from "./insight";
 import { appUrl, notify } from "./notify";
 import { getDocument, listMembers, logEvent, type Member } from "./repo";
 import { nextStage, stageDef, STATUS_LABEL, type Role } from "./workflow";
+import type { AppSettings } from "./db";
 
 export async function membersForStage(doc: DocRow, stageKey = doc.stage): Promise<Member[]> {
-  const st = stageDef(doc.doc_type, stageKey);
+  const st = stageDef((await getSettings()).workflows, doc.doc_type, stageKey);
   const all = await listMembers(true);
   if (st?.approval) return all.filter((m) => m.role === st.role);
   const pic = all.find((m) => m.id === doc.assignee_id);
@@ -17,16 +18,16 @@ export async function membersWithRole(role: Role) {
   return (await listMembers(true)).filter((m) => m.role === role);
 }
 
-export function canAct(member: Member, doc: DocRow): boolean {
+export function canAct(member: Member, doc: DocRow, s: AppSettings): boolean {
   if (member.role === "admin") return true;
-  const st = stageDef(doc.doc_type, doc.stage);
+  const st = stageDef(s.workflows, doc.doc_type, doc.stage);
   if (!st) return true;
   if (st.approval) return member.role === st.role;
   return member.role !== "cpo"; // CPLO only approves
 }
 
 async function notifyStage(doc: DocRow, headline: string) {
-  const st = stageDef(doc.doc_type, doc.stage);
+  const st = stageDef((await getSettings()).workflows, doc.doc_type, doc.stage);
   const who = await membersForStage(doc);
   await notify(who, {
     kind: "stage",
@@ -48,7 +49,7 @@ export async function moveToStage(docId: number, toStage: string, actor: string,
   );
   await logEvent(docId, { type: opts.type ?? "stage", actor, from: before.stage, to: toStage, message: opts.message ?? null });
   const after = (await getDocument(docId))!;
-  const st = stageDef(after.doc_type, toStage);
+  const st = stageDef((await getSettings()).workflows, after.doc_type, toStage);
   await notifyStage(after, opts.type === "revision" ? `Dikembalikan untuk revisi oleh ${actor}` : `${actor} memindahkan dokumen ke ${st?.label ?? toStage}`);
   return after;
 }
@@ -57,8 +58,8 @@ export async function completeStage(docId: number, actor: string, message?: stri
   const doc = await getDocument(docId);
   if (!doc) throw new Error("Dokumen tidak ditemukan");
   const settings = await getSettings();
-  const st = stageDef(doc.doc_type, doc.stage);
-  const next = nextStage(doc.doc_type, doc.stage, stageCtx(doc, settings));
+  const st = stageDef(settings.workflows, doc.doc_type, doc.stage);
+  const next = nextStage(settings.workflows, doc.doc_type, doc.stage, stageCtx(doc, settings));
   if (!next) {
     await query(`update documents set status='done', completed_at=now(), last_activity_at=now(), updated_at=now(), ai_suggestion=null where id=$1`, [docId]);
     await logEvent(docId, { type: "done", actor, from: doc.stage, message: message ?? "Dokumen selesai & diarsipkan" });

@@ -1,30 +1,39 @@
-// Workflow templates per document type.
-// Each stage has an SLA in working days and an owner role.
-// `approval: true` means only members with `role` (or admin) can approve it.
+// Approval flows per document type. Defaults live here; the team edits them in Pengaturan
+// (stored in app_settings.app.workflows). Every function takes the active `Workflows`.
 
 export type Role = "staff" | "manager" | "agm" | "cpo" | "admin";
-export type DocType = "vendor" | "principal" | "other";
+export type DocType = string;
 export type DocStatus = "active" | "on_hold" | "done" | "cancelled";
 export type RiskLevel = "low" | "medium" | "high";
+/** When a step applies: always, or only for high-value / high-risk documents. */
+export type Condition = "always" | "high_value";
 
 export interface StageDef {
   key: string;
   label: string;
   role: Role;
   slaDays: number;
-  approval?: boolean;
-  /** Stage only applies when condition returns true. */
-  when?: (ctx: StageContext) => boolean;
-  /** Where "minta revisi" sends the document back to. */
-  revisionTo?: string;
-  hint: string;
+  approval: boolean;
+  condition: Condition;
 }
+
+export interface TypeDef {
+  key: DocType;
+  label: string;
+  /** Subject tag, e.g. VENDOR for [VENDOR]. */
+  tag: string;
+  stages: StageDef[];
+}
+
+export type Workflows = TypeDef[];
 
 export interface StageContext {
   contractValue: number | null;
   riskLevel: RiskLevel;
   requireCpo: boolean | null;
   cpoThreshold: number;
+  /** Steps switched off for this one document. */
+  skip: string[];
 }
 
 export const ROLE_LABEL: Record<Role, string> = {
@@ -36,19 +45,7 @@ export const ROLE_LABEL: Record<Role, string> = {
 };
 
 /** Who an overdue item escalates to. */
-export const ESCALATION: Record<Role, Role | null> = {
-  staff: "manager",
-  manager: "agm",
-  agm: "cpo",
-  cpo: null,
-  admin: null,
-};
-
-export const DOC_TYPE_LABEL: Record<DocType, string> = {
-  vendor: "Kontrak vendor",
-  principal: "Kontrak prinsipal",
-  other: "Dokumen lain",
-};
+export const ESCALATION: Record<Role, Role | null> = { staff: "manager", manager: "agm", agm: "cpo", cpo: null, admin: null };
 
 export const STATUS_LABEL: Record<DocStatus, string> = {
   active: "Berjalan",
@@ -57,70 +54,126 @@ export const STATUS_LABEL: Record<DocStatus, string> = {
   cancelled: "Dibatalkan",
 };
 
-export const RISK_LABEL: Record<RiskLevel, string> = {
-  low: "Rendah",
-  medium: "Sedang",
-  high: "Tinggi",
-};
+export const RISK_LABEL: Record<RiskLevel, string> = { low: "Rendah", medium: "Sedang", high: "Tinggi" };
 
-const cpoNeeded = (c: StageContext) => {
-  if (c.requireCpo !== null) return c.requireCpo;
-  return c.riskLevel === "high" || (c.contractValue ?? 0) >= c.cpoThreshold;
-};
+const s = (key: string, label: string, role: Role, slaDays: number, approval = false, condition: Condition = "always"): StageDef => ({ key, label, role, slaDays, approval, condition });
 
-export const WORKFLOWS: Record<DocType, StageDef[]> = {
-  vendor: [
-    { key: "intake", label: "Diterima", role: "staff", slaDays: 1, hint: "Cek kelengkapan email & lampiran, tetapkan PIC." },
-    { key: "review", label: "Review legal", role: "staff", slaDays: 3, hint: "Review draft kontrak, tandai klausul berisiko." },
-    { key: "negotiation", label: "Negosiasi & revisi", role: "staff", slaDays: 5, hint: "Kirim markup ke vendor, sepakati perubahan." },
-    { key: "mgr_approval", label: "Approval Manager Legal", role: "manager", slaDays: 2, approval: true, revisionTo: "negotiation", hint: "Manager Legal menyetujui draft final." },
-    { key: "agm_approval", label: "Approval AGM Legal", role: "agm", slaDays: 2, approval: true, revisionTo: "negotiation", hint: "AGM Legal menyetujui draft final." },
-    { key: "cpo_approval", label: "Approval CPLO", role: "cpo", slaDays: 2, approval: true, revisionTo: "negotiation", when: cpoNeeded, hint: "Wajib bila nilai ≥ ambang CPLO atau risiko tinggi." },
-    { key: "signing", label: "Penandatanganan", role: "staff", slaDays: 5, hint: "Sirkulasi tanda tangan basah / e-sign kedua pihak." },
-    { key: "archive", label: "Arsip", role: "staff", slaDays: 1, hint: "Simpan dokumen final bertanda tangan." },
-  ],
-  principal: [
-    { key: "intake", label: "Diterima", role: "staff", slaDays: 1, hint: "Cek kelengkapan email & lampiran, tetapkan PIC." },
-    { key: "due_diligence", label: "Due diligence prinsipal", role: "staff", slaDays: 5, hint: "Legalitas prinsipal, HAKI/merek, izin edar." },
-    { key: "review", label: "Review legal", role: "staff", slaDays: 4, hint: "Review eksklusivitas, wilayah, target, terminasi." },
-    { key: "negotiation", label: "Negosiasi & revisi", role: "staff", slaDays: 7, hint: "Kirim markup ke prinsipal, sepakati perubahan." },
-    { key: "mgr_approval", label: "Approval Manager Legal", role: "manager", slaDays: 2, approval: true, revisionTo: "negotiation", hint: "Manager Legal menyetujui draft final." },
-    { key: "agm_approval", label: "Approval AGM Legal", role: "agm", slaDays: 2, approval: true, revisionTo: "negotiation", hint: "AGM Legal menyetujui draft final." },
-    { key: "cpo_approval", label: "Approval CPLO", role: "cpo", slaDays: 3, approval: true, revisionTo: "negotiation", hint: "Selalu wajib untuk kontrak prinsipal." },
-    { key: "signing", label: "Penandatanganan", role: "staff", slaDays: 7, hint: "Sirkulasi tanda tangan, termasuk legalisasi bila perlu." },
-    { key: "archive", label: "Arsip", role: "staff", slaDays: 1, hint: "Simpan dokumen final bertanda tangan." },
-  ],
-  other: [
-    { key: "intake", label: "Diterima", role: "staff", slaDays: 1, hint: "Cek kelengkapan email & lampiran, tetapkan PIC." },
-    { key: "review", label: "Review legal", role: "staff", slaDays: 3, hint: "Review dokumen." },
-    { key: "mgr_approval", label: "Approval Manager Legal", role: "manager", slaDays: 2, approval: true, revisionTo: "review", hint: "Manager Legal menyetujui." },
-    { key: "archive", label: "Arsip", role: "staff", slaDays: 1, hint: "Simpan dokumen final." },
-  ],
-};
+export const DEFAULT_WORKFLOWS: Workflows = [
+  {
+    key: "vendor", label: "Kontrak vendor", tag: "VENDOR",
+    stages: [
+      s("intake", "Diterima", "staff", 1),
+      s("review", "Review legal", "staff", 3),
+      s("negotiation", "Negosiasi & revisi", "staff", 5),
+      s("mgr_approval", "Persetujuan Manager", "manager", 2, true),
+      s("agm_approval", "Persetujuan AGM", "agm", 2, true),
+      s("cpo_approval", "Persetujuan CPLO", "cpo", 2, true, "high_value"),
+      s("signing", "Penandatanganan", "staff", 5),
+      s("archive", "Arsip", "staff", 1),
+    ],
+  },
+  {
+    key: "principal", label: "Kontrak prinsipal", tag: "PRINSIPAL",
+    stages: [
+      s("intake", "Diterima", "staff", 1),
+      s("due_diligence", "Due diligence prinsipal", "staff", 5),
+      s("review", "Review legal", "staff", 4),
+      s("negotiation", "Negosiasi & revisi", "staff", 7),
+      s("mgr_approval", "Persetujuan Manager", "manager", 2, true),
+      s("agm_approval", "Persetujuan AGM", "agm", 2, true),
+      s("cpo_approval", "Persetujuan CPLO", "cpo", 3, true),
+      s("signing", "Penandatanganan", "staff", 7),
+      s("archive", "Arsip", "staff", 1),
+    ],
+  },
+  {
+    key: "other", label: "Dokumen lain", tag: "LAIN",
+    stages: [
+      s("intake", "Diterima", "staff", 1),
+      s("review", "Review legal", "staff", 3),
+      s("mgr_approval", "Persetujuan Manager", "manager", 2, true),
+      s("archive", "Arsip", "staff", 1),
+    ],
+  },
+];
 
-export function stagesFor(type: DocType, ctx: StageContext): StageDef[] {
-  return (WORKFLOWS[type] ?? WORKFLOWS.other).filter((s) => !s.when || s.when(ctx));
+const SHORT: Record<string, string> = {
+  intake: "Diterima", due_diligence: "Due diligence", review: "Review", negotiation: "Negosiasi",
+  mgr_approval: "Manager", agm_approval: "AGM", cpo_approval: "CPLO", signing: "Tanda tangan", archive: "Arsip",
+};
+export const shortLabel = (st: StageDef) => SHORT[st.key] && st.label === DEFAULT_LABEL[st.key] ? SHORT[st.key] : st.label.length > 16 ? st.label.split(" ").slice(0, 2).join(" ") : st.label;
+const DEFAULT_LABEL: Record<string, string> = Object.fromEntries(DEFAULT_WORKFLOWS.flatMap((t) => t.stages.map((x) => [x.key, x.label])));
+
+export function typeDef(wf: Workflows, type: DocType): TypeDef {
+  return wf.find((t) => t.key === type) ?? wf.find((t) => t.key === "other") ?? wf[0];
 }
 
-export function stageDef(type: DocType, key: string): StageDef | undefined {
-  return (WORKFLOWS[type] ?? WORKFLOWS.other).find((s) => s.key === key);
+export const typeLabel = (wf: Workflows, type: DocType) => wf.find((t) => t.key === type)?.label ?? "Dokumen lain";
+
+export function conditionMet(st: StageDef, ctx: StageContext): boolean {
+  if (ctx.skip.includes(st.key)) return false;
+  if (st.condition === "always" || ctx.skip.includes(`+${st.key}`)) return true;
+  if (st.role === "cpo" && ctx.requireCpo !== null) return ctx.requireCpo;
+  return ctx.riskLevel === "high" || (ctx.contractValue ?? 0) >= ctx.cpoThreshold;
 }
 
-export function nextStage(type: DocType, key: string, ctx: StageContext): StageDef | null {
-  const list = stagesFor(type, ctx);
-  const i = list.findIndex((s) => s.key === key);
+/** Steps that apply to one document, in order. The current step is always kept. */
+export function stagesFor(wf: Workflows, type: DocType, ctx: StageContext, current?: string): StageDef[] {
+  return typeDef(wf, type).stages.filter((st) => st.key === current || conditionMet(st, ctx));
+}
+
+export function stageDef(wf: Workflows, type: DocType, key: string): StageDef | undefined {
+  return typeDef(wf, type).stages.find((st) => st.key === key);
+}
+
+export function nextStage(wf: Workflows, type: DocType, key: string, ctx: StageContext): StageDef | null {
+  const list = stagesFor(wf, type, ctx, key);
+  const i = list.findIndex((st) => st.key === key);
   if (i === -1) return list[0] ?? null;
   return list[i + 1] ?? null;
 }
 
-/** Kanban column keys in a stable order across all document types. */
-export const BOARD_COLUMNS: { key: string; label: string; stages: string[] }[] = [
-  { key: "in", label: "Masuk", stages: ["intake"] },
-  { key: "review", label: "Review & DD", stages: ["due_diligence", "review"] },
-  { key: "nego", label: "Negosiasi", stages: ["negotiation"] },
-  { key: "approval", label: "Approval", stages: ["mgr_approval", "agm_approval", "cpo_approval"] },
-  { key: "sign", label: "Tanda tangan & arsip", stages: ["signing", "archive"] },
-];
+/** "Kembalikan" sends a document to the closest earlier working (non-approval) step. */
+export function revisionTarget(wf: Workflows, type: DocType, key: string): StageDef | undefined {
+  const all = typeDef(wf, type).stages;
+  const i = all.findIndex((st) => st.key === key);
+  for (let k = i - 1; k >= 0; k--) if (!all[k].approval) return all[k];
+  return all[0];
+}
 
 export const isRole = (r: string): r is Role => r in ROLE_LABEL;
-export const isDocType = (t: string): t is DocType => t in DOC_TYPE_LABEL;
+export const isDocType = (wf: Workflows, t: string) => wf.some((x) => x.key === t);
+
+/** Validate and normalise a workflow config coming from the editor. Throws with a readable message. */
+export function normaliseWorkflows(input: unknown): Workflows {
+  if (!Array.isArray(input) || input.length === 0) throw new Error("Minimal harus ada satu jenis dokumen.");
+  const seenType = new Set<string>();
+  const seenTag = new Set<string>();
+  return input.map((t: Partial<TypeDef>) => {
+    const label = String(t.label ?? "").trim();
+    if (!label) throw new Error("Nama jenis dokumen tidak boleh kosong.");
+    const key = String(t.key ?? "").trim() || slug(label);
+    if (seenType.has(key)) throw new Error(`Jenis dokumen "${label}" dobel.`);
+    seenType.add(key);
+    const tag = String(t.tag ?? "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "") || slug(label).toUpperCase();
+    if (seenTag.has(tag)) throw new Error(`Tag subjek [${tag}] dipakai lebih dari satu jenis dokumen.`);
+    seenTag.add(tag);
+    if (!Array.isArray(t.stages) || t.stages.length === 0) throw new Error(`"${label}" harus punya minimal satu langkah.`);
+    const seen = new Set<string>();
+    const stages = t.stages.map((x: Partial<StageDef>) => {
+      const sl = String(x.label ?? "").trim();
+      if (!sl) throw new Error(`Ada langkah tanpa nama di "${label}".`);
+      let k = String(x.key ?? "").trim() || slug(sl);
+      while (seen.has(k)) k = `${k}_2`;
+      seen.add(k);
+      const role = isRole(String(x.role)) ? (x.role as Role) : "staff";
+      const days = Math.min(60, Math.max(0.5, Number(x.slaDays) || 1));
+      return { key: k, label: sl, role, slaDays: days, approval: Boolean(x.approval), condition: x.condition === "high_value" ? "high_value" : "always" } as StageDef;
+    });
+    return { key, label, tag, stages };
+  });
+}
+
+function slug(v: string) {
+  return v.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 32) || `x${Date.now().toString(36)}`;
+}

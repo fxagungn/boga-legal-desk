@@ -3,8 +3,8 @@ import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 
 /** Helps requesters write a subject line the system understands. */
-export function SubjectBuilder({ keyword, mailbox }: { keyword: string; mailbox: string | null }) {
-  const [type, setType] = useState("VENDOR");
+export function SubjectBuilder({ keyword, mailbox, types }: { keyword: string; mailbox: string | null; types: { tag: string; label: string }[] }) {
+  const [type, setType] = useState(types[0]?.tag ?? "LAIN");
   const [title, setTitle] = useState("");
   const [party, setParty] = useState("");
   const [deadline, setDeadline] = useState("");
@@ -18,9 +18,7 @@ export function SubjectBuilder({ keyword, mailbox }: { keyword: string; mailbox:
         <div>
           <label className="label" htmlFor="sb-type">Jenis dokumen</label>
           <select id="sb-type" className="input" value={type} onChange={(e) => setType(e.target.value)}>
-            <option value="VENDOR">Kontrak vendor</option>
-            <option value="PRINSIPAL">Kontrak prinsipal</option>
-            <option value="LAIN">Dokumen lain</option>
+            {types.map((t) => <option key={t.tag} value={t.tag}>{t.label}</option>)}
           </select>
         </div>
         <div>

@@ -3,7 +3,7 @@
 // Format:  [LEGAL][VENDOR|PRINSIPAL|LAIN][URGENT][DL:2026-11-20] Judul dokumen - PT Pihak Lawan
 // Replies: RE: / FW: / Balas: / Teruskan: prefixes are ignored. A code like LGL-2026-0012 links the email to a document.
 
-import type { DocType } from "./workflow";
+import type { DocType, Workflows } from "./workflow";
 
 export interface ParsedSubject {
   matched: boolean;
@@ -40,7 +40,7 @@ function parseDate(v: string): string | null {
   return null;
 }
 
-export function parseSubject(subject: string, keywords: string[]): ParsedSubject {
+export function parseSubject(subject: string, keywords: string[], wf: Workflows): ParsedSubject {
   const s = stripPrefixes(subject || "");
   const upper = (subject || "").toUpperCase();
   const matched = keywords.some((k) => k.trim() && upper.includes(k.trim().toUpperCase()));
@@ -51,9 +51,10 @@ export function parseSubject(subject: string, keywords: string[]): ParsedSubject
   let deadline: string | null = null;
   for (const t of tags) {
     const u = t.toUpperCase();
-    if (["VENDOR", "SUPPLIER", "PEMASOK"].includes(u)) docType = "vendor";
-    else if (["PRINSIPAL", "PRINCIPAL", "LISENSI", "FRANCHISE", "DISTRIBUSI"].includes(u)) docType = "principal";
-    else if (["LAIN", "OTHER", "NDA", "UMUM"].includes(u)) docType = "other";
+    const byTag = wf.find((t) => t.tag === u.replace(/[^A-Z0-9]/g, ""));
+    if (byTag) docType = byTag.key;
+    else if (["SUPPLIER", "PEMASOK"].includes(u) && wf.some((t) => t.key === "vendor")) docType = "vendor";
+    else if (["PRINCIPAL", "LISENSI", "FRANCHISE", "DISTRIBUSI"].includes(u) && wf.some((t) => t.key === "principal")) docType = "principal";
     else if (["URGENT", "SEGERA", "PENTING"].includes(u)) urgent = true;
     else {
       const dl = u.match(/^(DL|DEADLINE|TENGGAT)\s*[: ]\s*(.+)$/);

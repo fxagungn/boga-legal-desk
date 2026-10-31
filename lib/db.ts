@@ -1,4 +1,5 @@
 import { neon } from "@neondatabase/serverless";
+import { DEFAULT_WORKFLOWS, type Workflows } from "./workflow";
 
 export const hasDb = () => Boolean(dbUrl());
 const dbUrl = () => process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.DATABASE_URL_UNPOOLED || "";
@@ -24,7 +25,7 @@ function raw(): Client {
   return client;
 }
 
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 const MIGRATION = [
   `create table if not exists app_settings (key text primary key, value jsonb not null, updated_at timestamptz not null default now())`,
@@ -138,6 +139,16 @@ const MIGRATION = [
     created_at timestamptz not null default now()
   )`,
   `alter table team_members add column if not exists title text`,
+  // v7: NIK login, configurable workflows, per-document skipped steps
+  `alter table team_members add column if not exists nik text`,
+  `create unique index if not exists team_members_nik_idx on team_members (upper(nik))`,
+  `alter table team_members add column if not exists password_hash text`,
+  `alter table team_members add column if not exists must_change_password boolean not null default true`,
+  `alter table team_members add column if not exists failed_logins int not null default 0`,
+  `alter table team_members add column if not exists locked_until timestamptz`,
+  `alter table team_members add column if not exists last_login_at timestamptz`,
+  `alter table documents drop constraint if exists documents_doc_type_check`,
+  `alter table documents add column if not exists skip_stages jsonb not null default '[]'`,
   // v4: merge placeholder team members duplicated by a concurrent first-run seed.
   `update documents d set assignee_id = k.keep
      from (select id, min(id) over (partition by name, role) as keep from team_members where email is null and whatsapp is null) k
@@ -168,10 +179,12 @@ export function ensureSchema(): Promise<void> {
          on conflict (key) do update set value = excluded.value, updated_at = now()`,
         [JSON.stringify(SCHEMA_VERSION)],
       );
-    })().catch((e) => {
-      ready = null;
-      throw e;
-    });
+    })()
+      .then(() => applyCredentialSeed())
+      .catch((e) => {
+        ready = null;
+        throw e;
+      });
   }
   return ready;
 }
@@ -195,6 +208,13 @@ export interface AppSettings {
   holidays: string[];
   escalateAfterDays: number;
   digestEnabled: boolean;
+  workflows: Workflows;
+  /** UAT: banner on every page, notifications go only to uatRecipient, new documents are marked as test data. */
+  uatMode: boolean;
+  uatRecipient: string;
+  /** Maintenance: only Manager/AGM/Admin can use the app. */
+  maintenance: boolean;
+  maintenanceMessage: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -203,11 +223,18 @@ export const DEFAULT_SETTINGS: AppSettings = {
   holidays: ["2026-12-24", "2026-12-25", "2027-01-01"],
   escalateAfterDays: 1,
   digestEnabled: true,
+  workflows: DEFAULT_WORKFLOWS,
+  uatMode: false,
+  uatRecipient: "",
+  maintenance: false,
+  maintenanceMessage: "Legal Desk sedang dalam perbaikan dan akan segera kembali.",
 };
 
 export async function getSettings(): Promise<AppSettings> {
   const row = await one<{ value: Partial<AppSettings> }>(`select value from app_settings where key = 'app'`);
-  return { ...DEFAULT_SETTINGS, ...(row?.value ?? {}) };
+  const v = { ...DEFAULT_SETTINGS, ...(row?.value ?? {}) };
+  if (!Array.isArray(v.workflows) || v.workflows.length === 0) v.workflows = DEFAULT_WORKFLOWS;
+  return v;
 }
 
 export async function saveSettings(patch: Partial<AppSettings>) {
@@ -234,6 +261,33 @@ export async function setKV(key: string, value: unknown) {
 }
 
 /* ---------- seed ---------- */
+
+/**
+ * NIK + initial password (hash of the birth date, DDMMYYYY) for the Legal team.
+ * Comes from the LEGAL_TEAM_SEED env var so no personal data lives in the repo.
+ * Only fills members that have no NIK yet.
+ */
+async function applyCredentialSeed() {
+  const raw_ = process.env.LEGAL_TEAM_SEED;
+  if (!raw_) return;
+  const q = raw();
+  const missing = (await q.query(`select count(*)::int as n from team_members where nik is null and active`)) as { n: number }[];
+  if (!missing[0] || missing[0].n === 0) return;
+  let seed: { name: string; nik: string; hash: string | null }[] = [];
+  try {
+    seed = JSON.parse(raw_);
+  } catch {
+    console.error("LEGAL_TEAM_SEED is not valid JSON");
+    return;
+  }
+  for (const s of seed) {
+    await q.query(
+      `update team_members set nik = upper($2), password_hash = coalesce(password_hash, $3), must_change_password = true
+       where lower(name) = lower($1) and nik is null`,
+      [s.name, s.nik, s.hash],
+    );
+  }
+}
 
 /** v6: replace placeholder accounts with the real Legal team (one-time; later edits happen in Pengaturan). */
 async function applyTeamRoster() {

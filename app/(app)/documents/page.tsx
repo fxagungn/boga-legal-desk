@@ -3,7 +3,7 @@ import { Search } from "lucide-react";
 import { getSettings } from "@/lib/db";
 import { buildJourney } from "@/lib/journey";
 import { currentMember, listDocuments, listEventsFor, listMembers } from "@/lib/repo";
-import { DOC_TYPE_LABEL, type DocType } from "@/lib/workflow";
+import { typeLabel } from "@/lib/workflow";
 import { formatShort } from "@/lib/time";
 import { money } from "@/lib/format";
 import { HolderLine, MiniJourney } from "@/components/journey";
@@ -55,7 +55,7 @@ export default async function Documents({ searchParams }: { searchParams: Promis
         </div>
         <select name="type" defaultValue={sp.type ?? ""} className="input w-auto">
           <option value="">Semua jenis</option>
-          {(Object.keys(DOC_TYPE_LABEL) as DocType[]).map((k) => <option key={k} value={k}>{DOC_TYPE_LABEL[k]}</option>)}
+          {settings.workflows.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
         </select>
         {sp.status && <input type="hidden" name="status" value={sp.status} />}
         <button className="btn">Cari</button>
@@ -86,7 +86,7 @@ export default async function Documents({ searchParams }: { searchParams: Promis
                     </div>
                     <div className="truncate text-[15px] font-bold">{doc.title}</div>
                     <div className="truncate text-[13px] text-ink-2">
-                      {doc.counterparty ?? DOC_TYPE_LABEL[doc.doc_type]}
+                      {doc.counterparty ?? typeLabel(settings.workflows, doc.doc_type)}
                       {doc.contract_value !== null && ` · ${money(Number(doc.contract_value), doc.currency)}`}
                     </div>
                   </div>

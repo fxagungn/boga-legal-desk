@@ -3,7 +3,7 @@ import { Mail, PenLine, Upload } from "lucide-react";
 import { getSettings, query } from "@/lib/db";
 import { listMembers } from "@/lib/repo";
 import { graphConfigured, mailbox } from "@/lib/graph";
-import { DOC_TYPE_LABEL, RISK_LABEL, type DocType } from "@/lib/workflow";
+import { RISK_LABEL } from "@/lib/workflow";
 import { timeAgo } from "@/lib/time";
 import { EmailDrop } from "@/components/EmailDrop";
 import { SubjectBuilder } from "@/components/SubjectBuilder";
@@ -58,7 +58,7 @@ export default async function Intake({ searchParams }: { searchParams: Promise<{
 
       {via === "email" && (
         <Card title="Buat subjek email" sub={graphConfigured() ? "Mailbox legal sudah tersambung. Email baru dibaca otomatis." : "Bagikan format ini ke peminta di divisi lain."}>
-          <SubjectBuilder keyword={kw} mailbox={graphConfigured() ? mailbox() : null} />
+          <SubjectBuilder keyword={kw} mailbox={graphConfigured() ? mailbox() : null} types={settings.workflows.map((t) => ({ tag: t.tag, label: t.label }))} />
         </Card>
       )}
 
@@ -68,7 +68,7 @@ export default async function Intake({ searchParams }: { searchParams: Promise<{
             <div className="sm:col-span-2"><label className="label" htmlFor="m-title">Judul dokumen</label><input id="m-title" name="title" className="input" required placeholder="Perjanjian Jasa Logistik 2027" /></div>
             <div><label className="label" htmlFor="m-cp">Pihak lawan</label><input id="m-cp" name="counterparty" className="input" placeholder="PT …" /></div>
             <div><label className="label" htmlFor="m-type">Jenis dokumen</label>
-              <select id="m-type" name="doc_type" className="input">{(Object.keys(DOC_TYPE_LABEL) as DocType[]).map((k) => <option key={k} value={k}>{DOC_TYPE_LABEL[k]}</option>)}</select></div>
+              <select id="m-type" name="doc_type" className="input">{settings.workflows.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}</select></div>
             <div><label className="label" htmlFor="m-val">Nilai kontrak (Rp)</label><input id="m-val" name="contract_value" inputMode="numeric" className="input" placeholder="Opsional" /></div>
             <div><label className="label" htmlFor="m-dl">Deadline</label><input id="m-dl" name="deadline" type="date" className="input" /></div>
             <div><label className="label" htmlFor="m-pic">PIC</label>

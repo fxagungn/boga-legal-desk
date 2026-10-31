@@ -1,13 +1,12 @@
 import { redirect } from "next/navigation";
-import { hasDb } from "@/lib/db";
-import { listMembers } from "@/lib/repo";
+import { getSettings, hasDb } from "@/lib/db";
 import { LoginForm } from "./LoginForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  if (!hasDb() || !process.env.ACCESS_CODE) redirect("/setup");
-  const members = await listMembers(true);
+  if (!hasDb()) redirect("/setup");
+  const settings = await getSettings();
   const { next = "/" } = await searchParams;
   return (
     <div className="grid min-h-screen lg:grid-cols-[1fr_1.1fr]">
@@ -32,9 +31,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.svg" alt="" className="mb-6 h-10 w-10 lg:hidden" />
           <h1 className="text-2xl font-bold tracking-tight">Masuk</h1>
-          <p className="mt-1 mb-6 text-ink-2">Pilih nama Anda dan masukkan kode akses tim legal.</p>
-          <LoginForm members={members.map((m) => ({ id: m.id, name: m.name, role: m.role, title: m.title ?? null }))} next={next} />
-          <p className="mt-6 text-[13px] text-ink-3">Belum punya akses? Hubungi Manager Legal.</p>
+          <p className="mt-1 mb-6 text-ink-2">Gunakan NIK karyawan Anda.</p>
+          {settings.maintenance && <p className="mb-4 rounded-lg bg-warn-bg px-3 py-2 text-[13.5px] text-warn">{settings.maintenanceMessage}</p>}
+          {settings.uatMode && <p className="mb-4 rounded-lg bg-info-bg px-3 py-2 text-[13.5px] text-info">Mode UAT aktif: ini lingkungan uji coba.</p>}
+          <LoginForm next={next} />
+          <p className="mt-6 text-[13px] text-ink-3">Lupa password atau akun terkunci? Hubungi Manager Legal untuk reset.</p>
         </div>
       </div>
     </div>

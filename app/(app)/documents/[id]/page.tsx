@@ -4,7 +4,8 @@ import { ArrowLeft, ArrowUpRight, FileText, Paperclip, Sparkles } from "lucide-r
 import { getSettings } from "@/lib/db";
 import { buildJourney, needsMe } from "@/lib/journey";
 import { currentMember, getDocument, listAttachments, listEmails, listEvents, listMembers } from "@/lib/repo";
-import { DOC_TYPE_LABEL, RISK_LABEL, ROLE_LABEL, stageDef, type DocType } from "@/lib/workflow";
+import { conditionMet, RISK_LABEL, ROLE_LABEL, stageDef, typeDef, typeLabel } from "@/lib/workflow";
+import { stageCtx } from "@/lib/insight";
 import { deadlineText, PRIORITY } from "@/lib/labels";
 import { formatDate, formatDateTime, formatShort } from "@/lib/time";
 import { fileSize, money } from "@/lib/format";
@@ -33,10 +34,11 @@ export default async function DocumentPage({ params, searchParams }: { params: P
   const [events, emails, files, members] = await Promise.all([listEvents(id), listEmails(id), listAttachments(id), listMembers()]);
 
   const j = buildJourney(doc, [...events].reverse(), members, settings);
-  const mine = needsMe(doc, me);
+  const mine = needsMe(doc, me, settings);
+  const wf = settings.workflows;
   const pdf = files.find((f) => f.content_type.includes("pdf"));
   const s = doc.ai_suggestion;
-  const sStage = s?.stage ? stageDef(doc.doc_type, s.stage) : null;
+  const sStage = s?.stage ? stageDef(wf, doc.doc_type, s.stage) : null;
   const dl = j.ins.daysToDeadline;
   const tabs: { key: Tab; label: string }[] = [
     { key: "ringkasan", label: "Ringkasan" },
@@ -60,7 +62,7 @@ export default async function DocumentPage({ params, searchParams }: { params: P
         </div>
         <h1 className="mt-2 text-[26px] leading-tight font-bold tracking-tight">{doc.title}</h1>
         <p className="mt-1 text-ink-2">
-          {doc.code} · {DOC_TYPE_LABEL[doc.doc_type]} · {doc.counterparty ?? "Pihak lawan belum diisi"}
+          {doc.code} · {typeLabel(wf, doc.doc_type)} · {doc.counterparty ?? "Pihak lawan belum diisi"}
           {doc.contract_value !== null && <> · {money(Number(doc.contract_value), doc.currency)}</>}
         </p>
       </header>
@@ -81,7 +83,7 @@ export default async function DocumentPage({ params, searchParams }: { params: P
           ) : (
             <HolderLine j={j} />
           )}
-          <div className="hidden md:block"><DocActions doc={doc} j={j} me={me} /></div>
+          <div className="hidden md:block"><DocActions doc={doc} j={j} me={me} settings={settings} /></div>
         </div>
       </section>
 
@@ -154,7 +156,7 @@ export default async function DocumentPage({ params, searchParams }: { params: P
                       <div className="min-w-0 flex-1 text-[14px]">
                         <p>
                           <b>{e.actor ?? "Sistem"}</b> <span className="text-ink-2">{EVENT_LABEL[e.type] ?? e.type}</span>
-                          {e.to_stage && <> <b>{stageDef(doc.doc_type, e.to_stage)?.label ?? e.to_stage}</b></>}
+                          {e.to_stage && <> <b>{stageDef(wf, doc.doc_type, e.to_stage)?.label ?? e.to_stage}</b></>}
                         </p>
                         {e.message && e.type !== "created" && <p className={cx("mt-1", e.type === "note" || e.type === "revision" ? "rounded-lg bg-bg px-3 py-2" : "text-ink-2")}>{e.message}</p>}
                         <p className="mt-0.5 text-[12px] text-ink-3">{formatDateTime(e.created_at)}</p>
@@ -216,7 +218,7 @@ export default async function DocumentPage({ params, searchParams }: { params: P
                 <div className="sm:col-span-2"><label className="label" htmlFor="f-title">Judul dokumen</label><input id="f-title" name="title" defaultValue={doc.title} className="input" /></div>
                 <div><label className="label" htmlFor="f-cp">Pihak lawan</label><input id="f-cp" name="counterparty" defaultValue={doc.counterparty ?? ""} className="input" /></div>
                 <div><label className="label" htmlFor="f-type">Jenis dokumen</label>
-                  <select id="f-type" name="doc_type" defaultValue={doc.doc_type} className="input">{(Object.keys(DOC_TYPE_LABEL) as DocType[]).map((k) => <option key={k} value={k}>{DOC_TYPE_LABEL[k]}</option>)}</select></div>
+                  <select id="f-type" name="doc_type" defaultValue={doc.doc_type} className="input">{wf.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}</select></div>
                 <div><label className="label" htmlFor="f-val">Nilai kontrak</label><input id="f-val" name="contract_value" inputMode="numeric" defaultValue={doc.contract_value === null ? "" : Number(doc.contract_value).toLocaleString("id-ID")} className="input tnum" /></div>
                 <div><label className="label" htmlFor="f-cur">Mata uang</label><input id="f-cur" name="currency" defaultValue={doc.currency} className="input" /></div>
                 <div><label className="label" htmlFor="f-dl">Deadline</label><input id="f-dl" type="date" name="deadline" defaultValue={j.ins.deadline ?? ""} className="input" /></div>
@@ -224,14 +226,38 @@ export default async function DocumentPage({ params, searchParams }: { params: P
                   <select id="f-pic" name="assignee_id" defaultValue={doc.assignee_id ?? ""} className="input"><option value="">Belum ada</option>{members.filter((m) => m.active && m.role !== "cpo").map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div>
                 <div><label className="label" htmlFor="f-risk">Tingkat risiko</label>
                   <select id="f-risk" name="risk_level" defaultValue={doc.risk_level} className="input">{(["low", "medium", "high"] as const).map((k) => <option key={k} value={k}>{RISK_LABEL[k]}</option>)}</select></div>
-                {doc.doc_type === "vendor" ? (
-                  <div><label className="label" htmlFor="f-cpo">Perlu persetujuan CPLO?</label>
-                    <select id="f-cpo" name="require_cpo" defaultValue={doc.require_cpo === null ? "auto" : doc.require_cpo ? "yes" : "no"} className="input">
-                      <option value="auto">Otomatis (nilai ≥ {money(settings.cpoThreshold)} atau risiko tinggi)</option>
-                      <option value="yes">Ya, selalu</option>
-                      <option value="no">Tidak perlu</option>
-                    </select></div>
-                ) : <div />}
+                <div />
+                <fieldset className="sm:col-span-2">
+                  <legend className="label">Alur untuk dokumen ini</legend>
+                  <p className="hint -mt-1 mb-2">Atur langkah yang dilalui dokumen ini saja. Alur default diatur di Pengaturan.</p>
+                  <input type="hidden" name="steps_form" value="1" />
+                  <ul className="divide-y divide-line-2 rounded-lg border border-line">
+                    {typeDef(wf, doc.doc_type).stages.map((st) => {
+                      const skip = doc.skip_stages ?? [];
+                      const val = skip.includes(st.key) ? "skip" : skip.includes(`+${st.key}`) ? "force" : "auto";
+                      const current = st.key === doc.stage;
+                      const autoOn = conditionMet(st, { ...stageCtx(doc, settings), skip: [] });
+                      return (
+                        <li key={st.key} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-[14px]">
+                          <span>
+                            <span className="font-semibold">{st.label}</span>
+                            <span className="ml-1.5 text-[12.5px] text-ink-3">{ROLE_LABEL[st.role]}{st.approval ? " · persetujuan" : ""}</span>
+                          </span>
+                          {current ? (
+                            <span className="text-[12.5px] font-semibold text-brand">Langkah saat ini</span>
+                          ) : (
+                            <select name={`step_${st.key}`} defaultValue={val} className="input h-8 w-auto text-[13px]">
+                              {st.condition === "high_value"
+                                ? <><option value="auto">Otomatis ({autoOn ? "dilalui" : "dilewati"})</option><option value="force">Wajib dilalui</option></>
+                                : <option value="auto">Dilalui</option>}
+                              <option value="skip">Lewati</option>
+                            </select>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </fieldset>
                 <label className="flex items-center gap-2.5 text-[14px] font-semibold sm:col-span-2"><input type="checkbox" name="urgent" defaultChecked={doc.urgent} className="h-4 w-4 accent-[#c0272d]" /> Tandai urgent</label>
                 <div className="sm:col-span-2"><Submit>Simpan perubahan</Submit></div>
               </ActionForm>
@@ -273,7 +299,7 @@ export default async function DocumentPage({ params, searchParams }: { params: P
         </aside>
       </div>
 
-      <DocActions doc={doc} j={j} me={me} layout="bar" />
+      <DocActions doc={doc} j={j} me={me} settings={settings} layout="bar" />
     </div>
   );
 }

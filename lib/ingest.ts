@@ -6,7 +6,7 @@ import { parseSubject } from "./subject";
 import { getDocument, logEvent, nextCode, pickAssignee } from "./repo";
 import { appUrl, notify } from "./notify";
 import { membersForStage, resume } from "./flow";
-import { stageDef } from "./workflow";
+import { isDocType, stageDef } from "./workflow";
 
 export interface IncomingEmail {
   source: "graph" | "upload" | "webhook" | "manual";
@@ -92,7 +92,7 @@ export async function ingestEmail(e: IncomingEmail, opts: { force?: boolean } = 
   }
 
   const settings = await getSettings();
-  const p = parseSubject(e.subject, settings.subjectKeywords);
+  const p = parseSubject(e.subject, settings.subjectKeywords, settings.workflows);
   const existingId = await findDocument(e, p.code, p.normalized);
 
   if (!existingId && !p.matched && !opts.force) {
@@ -119,8 +119,8 @@ export async function ingestEmail(e: IncomingEmail, opts: { force?: boolean } = 
 
     if (aiEnabled() && doc.status !== "done" && doc.status !== "cancelled") {
       try {
-        const s = await suggestUpdate(doc, { subject: e.subject, from, body: e.body });
-        if (s.suggested_stage && s.suggested_stage !== doc.stage && stageDef(doc.doc_type, s.suggested_stage)) {
+        const s = await suggestUpdate(doc, settings.workflows, { subject: e.subject, from, body: e.body });
+        if (s.suggested_stage && s.suggested_stage !== doc.stage && stageDef(settings.workflows, doc.doc_type, s.suggested_stage)) {
           await query(`update documents set ai_suggestion=$2::jsonb where id=$1`, [existingId, JSON.stringify({ stage: s.suggested_stage, hold: s.hold, reason: s.reason, emailId: em.id, at: new Date().toISOString() })]);
         } else if (s.hold && doc.status === "active") {
           await query(`update documents set ai_suggestion=$2::jsonb where id=$1`, [existingId, JSON.stringify({ stage: null, hold: true, reason: s.reason, emailId: em.id, at: new Date().toISOString() })]);
@@ -146,7 +146,7 @@ export async function ingestEmail(e: IncomingEmail, opts: { force?: boolean } = 
   let aiError: string | null = null;
   if (aiEnabled()) {
     try {
-      ai = await extractFromEmail({ subject: e.subject, from, body: e.body, receivedAt: e.receivedAt }, e.attachments);
+      ai = await extractFromEmail({ subject: e.subject, from, body: e.body, receivedAt: e.receivedAt }, e.attachments, settings.workflows);
     } catch (err) {
       aiError = err instanceof Error ? err.message : String(err);
       console.error("extract failed", err);
@@ -155,12 +155,13 @@ export async function ingestEmail(e: IncomingEmail, opts: { force?: boolean } = 
 
   const code = await nextCode();
   const assignee = await pickAssignee();
-  const docType = p.docType ?? ai?.doc_type ?? "vendor";
+  const aiType = ai?.doc_type && isDocType(settings.workflows, ai.doc_type) ? ai.doc_type : null;
+  const docType = p.docType ?? aiType ?? settings.workflows[0].key;
   const value = ai?.contract_value ?? null;
   const row = await one<{ id: number }>(
     `insert into documents (code, title, doc_type, counterparty, contract_value, currency, deadline, urgent, risk_level, assignee_id,
-       requester_name, requester_email, summary, key_points, source, thread_key, normalized_subject)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15,$16,$17) returning id`,
+       requester_name, requester_email, summary, key_points, source, thread_key, normalized_subject, is_demo)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15,$16,$17,$18) returning id`,
     [
       code,
       ai?.title || p.title,
@@ -179,6 +180,7 @@ export async function ingestEmail(e: IncomingEmail, opts: { force?: boolean } = 
       e.source === "graph" || e.source === "webhook" ? "email" : e.source,
       e.threadKey ?? null,
       p.normalized,
+      settings.uatMode,
     ],
   );
   const docId = row!.id;

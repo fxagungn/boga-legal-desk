@@ -8,7 +8,7 @@ export async function proxy(req: NextRequest) {
   if (PUBLIC.some((p) => pathname === p || pathname.startsWith(p + "/"))) return NextResponse.next();
 
   const hasDb = Boolean(process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.DATABASE_URL_UNPOOLED);
-  if (!hasDb || !process.env.ACCESS_CODE) return NextResponse.redirect(new URL("/setup", req.url));
+  if (!hasDb) return NextResponse.redirect(new URL("/setup", req.url));
 
   const session = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
   if (!session) {

@@ -4,14 +4,16 @@ import type { DocRow } from "@/lib/insight";
 import type { Journey } from "@/lib/journey";
 import type { Member } from "@/lib/repo";
 import { canAct } from "@/lib/flow";
-import { ROLE_LABEL, stageDef, WORKFLOWS } from "@/lib/workflow";
+import { revisionTarget, ROLE_LABEL, stageDef, typeDef } from "@/lib/workflow";
+import type { AppSettings } from "@/lib/db";
 import { ActionButton, ActionDialog } from "./actions";
 import { cx } from "./ui";
 
 /** The one place a user decides what happens next. `layout="bar"` = sticky mobile bar. */
-export function DocActions({ doc, j, me, layout = "inline" }: { doc: DocRow; j: Journey; me: Member; layout?: "inline" | "bar" }) {
-  const st = stageDef(doc.doc_type, doc.stage);
-  const allowed = canAct(me, doc);
+export function DocActions({ doc, j, me, settings, layout = "inline" }: { doc: DocRow; j: Journey; me: Member; settings: AppSettings; layout?: "inline" | "bar" }) {
+  const wf = settings.workflows;
+  const st = stageDef(wf, doc.doc_type, doc.stage);
+  const allowed = canAct(me, doc, settings);
   const lead = ["manager", "agm", "admin"].includes(me.role);
   const idx = j.steps.findIndex((s) => s.key === doc.stage);
   const next = idx >= 0 ? j.steps[idx + 1] : undefined;
@@ -29,7 +31,7 @@ export function DocActions({ doc, j, me, layout = "inline" }: { doc: DocRow; j: 
         <ActionDialog
           action={A.revisionAction} id={doc.id} triggerClass={cx("btn", grow)}
           trigger={<><CornerUpLeft size={16} /> Kembalikan</>}
-          title="Kembalikan untuk revisi" desc={`Dokumen kembali ke ${stageDef(doc.doc_type, st.revisionTo ?? "review")?.label} dan PIC mendapat notifikasi.`}
+          title="Kembalikan untuk revisi" desc={`Dokumen kembali ke ${revisionTarget(wf, doc.doc_type, st.key)?.label} dan PIC mendapat notifikasi.`}
           submit="Kembalikan" success="Dikembalikan untuk revisi"
         >
           <label className="label" htmlFor="rev-note">Apa yang perlu diperbaiki?</label>
@@ -91,7 +93,7 @@ export function DocActions({ doc, j, me, layout = "inline" }: { doc: DocRow; j: 
         >
           <label className="label" htmlFor="mv-stage">Langkah tujuan</label>
           <select id="mv-stage" name="stage" className="input" defaultValue={doc.stage}>
-            {WORKFLOWS[doc.doc_type].map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+            {typeDef(wf, doc.doc_type).stages.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
           <label className="label mt-3" htmlFor="mv-note">Alasan</label>
           <input id="mv-note" name="note" className="input" />

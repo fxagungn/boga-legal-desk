@@ -30,8 +30,15 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <div className="w-full max-w-sm">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.svg" alt="" className="mb-6 h-10 w-10 lg:hidden" />
-          <h1 className="text-2xl font-bold tracking-tight">Masuk</h1>
-          <p className="mt-1 mb-6 text-ink-2">Gunakan NIK karyawan Anda.</p>
+          <p className="text-[12.5px] font-bold tracking-[0.08em] text-brand uppercase">Boga Legal Desk</p>
+          <h1 className="mt-2 text-[26px] leading-tight font-extrabold tracking-tight text-balance">Welcome to Legal Document Management System</h1>
+          <p className="mt-3 text-[14.5px] leading-relaxed text-ink-2">
+            Satu tempat untuk memantau dokumen legal Boga Group, mulai dari permintaan masuk lewat email, review, persetujuan, sampai tanda tangan. Progres dan posisi setiap dokumen bisa dilihat semua tim.
+          </p>
+          <div className="mt-7 mb-5 border-t border-line pt-6">
+            <h2 className="text-[17px] font-bold">Masuk</h2>
+            <p className="mt-0.5 text-[14px] text-ink-2">Gunakan NIK karyawan Anda.</p>
+          </div>
           {settings.maintenance && <p className="mb-4 rounded-lg bg-warn-bg px-3 py-2 text-[13.5px] text-warn">{settings.maintenanceMessage}</p>}
           {settings.uatMode && <p className="mb-4 rounded-lg bg-info-bg px-3 py-2 text-[13.5px] text-info">Mode UAT aktif: ini lingkungan uji coba.</p>}
           <LoginForm next={next} />

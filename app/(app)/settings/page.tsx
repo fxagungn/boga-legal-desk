@@ -76,7 +76,7 @@ export default async function Settings() {
               <p className="hint">Email dengan kata ini di subjek otomatis menjadi dokumen. Satu per baris.</p>
             </div>
             <div>
-              <label className="label" htmlFor="s-cpo">Kontrak vendor perlu persetujuan CPO jika nilainya minimal (Rp)</label>
+              <label className="label" htmlFor="s-cpo">Kontrak vendor perlu persetujuan CPLO jika nilainya minimal (Rp)</label>
               <input id="s-cpo" name="cpoThreshold" defaultValue={settings.cpoThreshold.toLocaleString("id-ID")} className="input tnum" disabled={!lead} />
             </div>
             <div>

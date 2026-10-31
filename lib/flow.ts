@@ -22,7 +22,7 @@ export function canAct(member: Member, doc: DocRow): boolean {
   const st = stageDef(doc.doc_type, doc.stage);
   if (!st) return true;
   if (st.approval) return member.role === st.role;
-  return member.role !== "cpo"; // CPO only approves
+  return member.role !== "cpo"; // CPLO only approves
 }
 
 async function notifyStage(doc: DocRow, headline: string) {

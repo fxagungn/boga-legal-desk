@@ -4,7 +4,7 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { login } from "@/app/actions";
 import { ROLE_LABEL, type Role } from "@/lib/workflow";
 
-export function LoginForm({ members, next }: { members: { id: number; name: string; role: Role }[]; next: string }) {
+export function LoginForm({ members, next }: { members: { id: number; name: string; role: Role; title: string | null }[]; next: string }) {
   const [state, action, pending] = useActionState(login, null);
   const [show, setShow] = useState(false);
   return (
@@ -15,7 +15,7 @@ export function LoginForm({ members, next }: { members: { id: number; name: stri
         <select id="member" name="member" className="input" required defaultValue="">
           <option value="" disabled>Pilih nama Anda</option>
           {members.map((m) => (
-            <option key={m.id} value={m.id}>{m.name} ({ROLE_LABEL[m.role]})</option>
+            <option key={m.id} value={m.id}>{m.name} — {m.title ?? ROLE_LABEL[m.role]}</option>
           ))}
         </select>
       </div>

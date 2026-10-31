@@ -31,7 +31,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   staff: "Staff Legal",
   manager: "Manager Legal",
   agm: "AGM Legal",
-  cpo: "Chief People Officer",
+  cpo: "CPLO",
   admin: "Admin",
 };
 
@@ -75,7 +75,7 @@ export const WORKFLOWS: Record<DocType, StageDef[]> = {
     { key: "negotiation", label: "Negosiasi & revisi", role: "staff", slaDays: 5, hint: "Kirim markup ke vendor, sepakati perubahan." },
     { key: "mgr_approval", label: "Approval Manager Legal", role: "manager", slaDays: 2, approval: true, revisionTo: "negotiation", hint: "Manager Legal menyetujui draft final." },
     { key: "agm_approval", label: "Approval AGM Legal", role: "agm", slaDays: 2, approval: true, revisionTo: "negotiation", hint: "AGM Legal menyetujui draft final." },
-    { key: "cpo_approval", label: "Approval CPO", role: "cpo", slaDays: 2, approval: true, revisionTo: "negotiation", when: cpoNeeded, hint: "Wajib bila nilai ≥ ambang CPO atau risiko tinggi." },
+    { key: "cpo_approval", label: "Approval CPLO", role: "cpo", slaDays: 2, approval: true, revisionTo: "negotiation", when: cpoNeeded, hint: "Wajib bila nilai ≥ ambang CPLO atau risiko tinggi." },
     { key: "signing", label: "Penandatanganan", role: "staff", slaDays: 5, hint: "Sirkulasi tanda tangan basah / e-sign kedua pihak." },
     { key: "archive", label: "Arsip", role: "staff", slaDays: 1, hint: "Simpan dokumen final bertanda tangan." },
   ],
@@ -86,7 +86,7 @@ export const WORKFLOWS: Record<DocType, StageDef[]> = {
     { key: "negotiation", label: "Negosiasi & revisi", role: "staff", slaDays: 7, hint: "Kirim markup ke prinsipal, sepakati perubahan." },
     { key: "mgr_approval", label: "Approval Manager Legal", role: "manager", slaDays: 2, approval: true, revisionTo: "negotiation", hint: "Manager Legal menyetujui draft final." },
     { key: "agm_approval", label: "Approval AGM Legal", role: "agm", slaDays: 2, approval: true, revisionTo: "negotiation", hint: "AGM Legal menyetujui draft final." },
-    { key: "cpo_approval", label: "Approval CPO", role: "cpo", slaDays: 3, approval: true, revisionTo: "negotiation", hint: "Selalu wajib untuk kontrak prinsipal." },
+    { key: "cpo_approval", label: "Approval CPLO", role: "cpo", slaDays: 3, approval: true, revisionTo: "negotiation", hint: "Selalu wajib untuk kontrak prinsipal." },
     { key: "signing", label: "Penandatanganan", role: "staff", slaDays: 7, hint: "Sirkulasi tanda tangan, termasuk legalisasi bila perlu." },
     { key: "archive", label: "Arsip", role: "staff", slaDays: 1, hint: "Simpan dokumen final bertanda tangan." },
   ],

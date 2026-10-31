@@ -21,7 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Avatar name={me.name} size={32} />
           <div className="min-w-0 flex-1 leading-tight">
             <div className="truncate text-[13.5px] font-bold">{me.name}</div>
-            <div className="truncate text-[12px] text-ink-3">{ROLE_LABEL[me.role]}</div>
+            <div className="truncate text-[12px] text-ink-3">{me.title ?? ROLE_LABEL[me.role]}</div>
           </div>
           <form action={logout}>
             <button className="btn btn-ghost btn-sm px-2" title="Keluar" aria-label="Keluar"><LogOut size={16} /></button>

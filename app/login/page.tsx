@@ -33,7 +33,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <img src="/logo.svg" alt="" className="mb-6 h-10 w-10 lg:hidden" />
           <h1 className="text-2xl font-bold tracking-tight">Masuk</h1>
           <p className="mt-1 mb-6 text-ink-2">Pilih nama Anda dan masukkan kode akses tim legal.</p>
-          <LoginForm members={members.map((m) => ({ id: m.id, name: m.name, role: m.role }))} next={next} />
+          <LoginForm members={members.map((m) => ({ id: m.id, name: m.name, role: m.role, title: m.title ?? null }))} next={next} />
           <p className="mt-6 text-[13px] text-ink-3">Belum punya akses? Hubungi Manager Legal.</p>
         </div>
       </div>

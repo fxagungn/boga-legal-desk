@@ -52,7 +52,7 @@ const SHORT: Record<string, string> = {
   negotiation: "Negosiasi",
   mgr_approval: "Manager",
   agm_approval: "AGM",
-  cpo_approval: "CPO",
+  cpo_approval: "CPLO",
   signing: "Tanda tangan",
   archive: "Arsip",
 };

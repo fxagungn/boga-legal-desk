@@ -11,6 +11,7 @@ export interface Member {
   email: string | null;
   whatsapp: string | null;
   active: boolean;
+  title?: string | null;
 }
 
 export interface EventRow {
@@ -89,12 +90,12 @@ export async function listAttachments(docId: number) {
 }
 
 export async function listMembers(activeOnly = false) {
-  return query<Member>(`select id, name, role, email, whatsapp, active from team_members ${activeOnly ? "where active" : ""} order by
+  return query<Member>(`select id, name, role, email, whatsapp, active, title from team_members ${activeOnly ? "where active" : ""} order by
     case role when 'staff' then 1 when 'manager' then 2 when 'agm' then 3 when 'cpo' then 4 else 5 end, name`);
 }
 
 export async function getMember(id: number) {
-  return one<Member>(`select id, name, role, email, whatsapp, active from team_members where id = $1`, [id]);
+  return one<Member>(`select id, name, role, email, whatsapp, active, title from team_members where id = $1`, [id]);
 }
 
 export async function logEvent(docId: number, e: { type: string; actor?: string | null; from?: string | null; to?: string | null; message?: string | null; meta?: unknown }) {

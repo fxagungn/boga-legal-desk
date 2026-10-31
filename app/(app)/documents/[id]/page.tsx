@@ -225,7 +225,7 @@ export default async function DocumentPage({ params, searchParams }: { params: P
                 <div><label className="label" htmlFor="f-risk">Tingkat risiko</label>
                   <select id="f-risk" name="risk_level" defaultValue={doc.risk_level} className="input">{(["low", "medium", "high"] as const).map((k) => <option key={k} value={k}>{RISK_LABEL[k]}</option>)}</select></div>
                 {doc.doc_type === "vendor" ? (
-                  <div><label className="label" htmlFor="f-cpo">Perlu persetujuan CPO?</label>
+                  <div><label className="label" htmlFor="f-cpo">Perlu persetujuan CPLO?</label>
                     <select id="f-cpo" name="require_cpo" defaultValue={doc.require_cpo === null ? "auto" : doc.require_cpo ? "yes" : "no"} className="input">
                       <option value="auto">Otomatis (nilai ≥ {money(settings.cpoThreshold)} atau risiko tinggi)</option>
                       <option value="yes">Ya, selalu</option>

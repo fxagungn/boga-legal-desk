@@ -24,7 +24,7 @@ function raw(): Client {
   return client;
 }
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 const MIGRATION = [
   `create table if not exists app_settings (key text primary key, value jsonb not null, updated_at timestamptz not null default now())`,
@@ -137,6 +137,7 @@ const MIGRATION = [
     detail text,
     created_at timestamptz not null default now()
   )`,
+  `alter table team_members add column if not exists title text`,
   // v4: merge placeholder team members duplicated by a concurrent first-run seed.
   `update documents d set assignee_id = k.keep
      from (select id, min(id) over (partition by name, role) as keep from team_members where email is null and whatsapp is null) k
@@ -161,6 +162,7 @@ export function ensureSchema(): Promise<void> {
       for (const stmt of MIGRATION) await q.query(stmt);
       await seedIfEmpty();
       await attachDemoDrafts();
+      await applyTeamRoster();
       await q.query(
         `insert into app_settings (key, value) values ('schema_version', $1::jsonb)
          on conflict (key) do update set value = excluded.value, updated_at = now()`,
@@ -233,6 +235,37 @@ export async function setKV(key: string, value: unknown) {
 
 /* ---------- seed ---------- */
 
+/** v6: replace placeholder accounts with the real Legal team (one-time; later edits happen in Pengaturan). */
+async function applyTeamRoster() {
+  const q = raw();
+  const lock = (await q.query(
+    `insert into app_settings (key, value) values ('team_roster_v1', 'true'::jsonb) on conflict (key) do nothing returning key`,
+  )) as unknown[];
+  if (lock.length === 0) return;
+  const { LEGAL_TEAM, PLACEHOLDER_MAP } = await import("./team");
+  const ids = new Map<string, number>();
+  for (const m of LEGAL_TEAM) {
+    const existing = (await q.query(`select id from team_members where lower(name) = lower($1) limit 1`, [m.name])) as { id: number }[];
+    if (existing[0]) {
+      await q.query(`update team_members set role=$2, email=coalesce(email,$3), title=$4, active=true where id=$1`, [existing[0].id, m.role, m.email, m.title]);
+      ids.set(m.name, existing[0].id);
+    } else {
+      const r = (await q.query(`insert into team_members (name, role, email, title) values ($1,$2,$3,$4) returning id`, [m.name, m.role, m.email, m.title])) as { id: number }[];
+      ids.set(m.name, r[0].id);
+    }
+  }
+  // Hand documents held by placeholder accounts to their real counterpart, then remove the placeholders.
+  for (const [placeholder, real] of Object.entries(PLACEHOLDER_MAP)) {
+    const to = ids.get(real);
+    if (!to) continue;
+    await q.query(
+      `update documents set assignee_id = $1 where assignee_id in (select id from team_members where name = $2 and email is null)`,
+      [to, placeholder],
+    );
+    await q.query(`delete from team_members where name = $1 and email is null and whatsapp is null`, [placeholder]);
+  }
+}
+
 /** v5: give demo documents a draft PDF so the preview has something to show. */
 async function attachDemoDrafts() {
   const q = raw();
@@ -268,7 +301,7 @@ async function seedIfEmpty() {
     ["Staff Legal 2", "staff"],
     ["Manager Legal", "manager"],
     ["AGM Legal", "agm"],
-    ["Chief People Officer", "cpo"],
+    ["CPLO", "cpo"],
   ];
   const ids: number[] = [];
   for (const [name, role] of team) {

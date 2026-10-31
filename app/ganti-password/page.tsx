@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { logout } from "@/app/actions";
 import { currentMember } from "@/lib/repo";
 import { ChangePasswordForm } from "./ChangePasswordForm";
 
@@ -18,6 +20,16 @@ export default async function ChangePassword({ searchParams }: { searchParams: P
           {me.must_change_password ? <>Halo {me.name.split(" ")[0]}, demi keamanan ganti password awal (tanggal lahir) sebelum mulai.</> : "Masukkan password lama dan password baru Anda."}
         </p>
         <ChangePasswordForm next={next} />
+        <div className="mt-6 border-t border-line pt-4 text-center text-[13.5px] text-ink-2">
+          {me.must_change_password ? (
+            <form action={logout}>
+              Bukan {me.name.split(" ")[0]}?{" "}
+              <button className="font-semibold text-brand hover:underline">Keluar &amp; masuk dengan akun lain</button>
+            </form>
+          ) : (
+            <Link href="/" className="font-semibold text-brand hover:underline">← Kembali ke beranda</Link>
+          )}
+        </div>
       </div>
     </div>
   );

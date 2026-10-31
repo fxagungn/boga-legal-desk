@@ -40,6 +40,8 @@ async function run(fn: () => Promise<void | string>): Promise<Result> {
 const MAX_TRIES = 5;
 const LOCK_MINUTES = 15;
 
+const COOKIE_OPTS = { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax" as const, path: "/" };
+
 export async function login(_: unknown, f: FormData) {
   const nik = str(f, "nik").toUpperCase().replace(/\s+/g, "");
   const password = String(f.get("password") ?? "");
@@ -65,7 +67,8 @@ export async function login(_: unknown, f: FormData) {
   }
   await query(`update team_members set failed_logins = 0, locked_until = null, last_login_at = now() where id = $1`, [m.id]);
   const jar = await cookies();
-  jar.set(SESSION_COOKIE, await signSession(m.id), { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 30 * 86400 });
+  // Until the initial password is changed the session lasts only for this browser session.
+  jar.set(SESSION_COOKIE, await signSession(m.id), { ...COOKIE_OPTS, ...(m.must_change_password ? {} : { maxAge: 30 * 86400 }) });
   const next = str(f, "next");
   const dest = next.startsWith("/") && !next.startsWith("//") ? next : "/";
   redirect(m.must_change_password ? `/ganti-password?next=${encodeURIComponent(dest)}` : dest);
@@ -84,6 +87,7 @@ export async function changePasswordAction(_: unknown, f: FormData) {
   const problem = passwordProblem(next, me.nik ?? null);
   if (problem) return { error: problem };
   await query(`update team_members set password_hash = $2, must_change_password = false where id = $1`, [me.id, hashPassword(next)]);
+  (await cookies()).set(SESSION_COOKIE, await signSession(me.id), { ...COOKIE_OPTS, maxAge: 30 * 86400 });
   const dest = str(f, "next");
   redirect(dest.startsWith("/") && !dest.startsWith("//") ? dest : "/");
 }

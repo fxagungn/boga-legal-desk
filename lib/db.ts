@@ -265,27 +265,37 @@ export async function setKV(key: string, value: unknown) {
 /**
  * NIK + initial password (hash of the birth date, DDMMYYYY) for the Legal team.
  * Comes from the LEGAL_TEAM_SEED env var so no personal data lives in the repo.
- * Only fills members that have no NIK yet.
+ * Only touches NIKs that are not in the table yet: fills an existing member matched by name,
+ * or creates the member when the entry carries a role (e.g. an extra trial/admin account).
  */
 async function applyCredentialSeed() {
   const raw_ = process.env.LEGAL_TEAM_SEED;
   if (!raw_) return;
-  const q = raw();
-  const missing = (await q.query(`select count(*)::int as n from team_members where nik is null and active`)) as { n: number }[];
-  if (!missing[0] || missing[0].n === 0) return;
-  let seed: { name: string; nik: string; hash: string | null }[] = [];
+  let seed: { name: string; nik: string; hash: string | null; role?: string; title?: string; email?: string }[] = [];
   try {
     seed = JSON.parse(raw_);
   } catch {
     console.error("LEGAL_TEAM_SEED is not valid JSON");
     return;
   }
+  const q = raw();
+  const have = new Set(((await q.query(`select upper(nik) as nik from team_members where nik is not null`)) as { nik: string }[]).map((r) => r.nik));
+  const roles = ["staff", "manager", "agm", "cpo", "admin"];
   for (const s of seed) {
-    await q.query(
-      `update team_members set nik = upper($2), password_hash = coalesce(password_hash, $3), must_change_password = true
-       where lower(name) = lower($1) and nik is null`,
-      [s.name, s.nik, s.hash],
-    );
+    const nik = String(s.nik ?? "").trim().toUpperCase();
+    if (!nik || have.has(nik)) continue;
+    const upd = (await q.query(
+      `update team_members set nik = $2, password_hash = coalesce(password_hash, $3), must_change_password = true
+       where lower(name) = lower($1) and nik is null returning id`,
+      [s.name, nik, s.hash],
+    )) as unknown[];
+    if (upd.length === 0 && s.role && roles.includes(s.role)) {
+      await q.query(
+        `insert into team_members (name, role, title, email, nik, password_hash, must_change_password, active)
+         values ($1, $2, $3, $4, $5, $6, true, true) on conflict do nothing`,
+        [s.name, s.role, s.title ?? null, s.email ?? null, nik, s.hash],
+      );
+    }
   }
 }
 

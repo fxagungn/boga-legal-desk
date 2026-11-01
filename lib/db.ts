@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { DEFAULT_WORKFLOWS, type Workflows } from "./workflow";
+import { LDMS_MIGRATION } from "./ldms/schema";
 
 export const hasDb = () => Boolean(dbUrl());
 const dbUrl = () => process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.DATABASE_URL_UNPOOLED || "";
@@ -25,7 +26,7 @@ function raw(): Client {
   return client;
 }
 
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 
 const MIGRATION = [
   `create table if not exists app_settings (key text primary key, value jsonb not null, updated_at timestamptz not null default now())`,
@@ -156,6 +157,8 @@ const MIGRATION = [
   `delete from team_members t
      using (select id, min(id) over (partition by name, role) as keep from team_members where email is null and whatsapp is null) k
      where t.id = k.id and k.id <> k.keep`,
+  // v8: LDMS (perizinan, catatan, file, reminder, audit)
+  ...LDMS_MIGRATION,
 ];
 
 let ready: Promise<void> | null = null;
@@ -174,6 +177,7 @@ export function ensureSchema(): Promise<void> {
       await seedIfEmpty();
       await attachDemoDrafts();
       await applyTeamRoster();
+      await (await import("./ldms/seed")).seedLdms(q);
       await q.query(
         `insert into app_settings (key, value) values ('schema_version', $1::jsonb)
          on conflict (key) do update set value = excluded.value, updated_at = now()`,
@@ -280,7 +284,7 @@ async function applyCredentialSeed() {
   }
   const q = raw();
   const have = new Set(((await q.query(`select upper(nik) as nik from team_members where nik is not null`)) as { nik: string }[]).map((r) => r.nik));
-  const roles = ["staff", "manager", "agm", "cpo", "admin"];
+  const roles = ["staff", "supervisor", "manager", "agm", "cpo", "admin"];
   for (const s of seed) {
     const nik = String(s.nik ?? "").trim().toUpperCase();
     if (!nik || have.has(nik)) continue;

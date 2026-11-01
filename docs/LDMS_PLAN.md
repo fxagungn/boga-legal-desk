@@ -1,7 +1,7 @@
 # LDMS Boga Group — Rencana Build (v0.1, draft untuk dikonfirmasi)
 
 > Sumber: `LDMS_Blueprint.md`, `LIST_PERIZINAN_JATUH_TEMPO.xlsx`, sheet karyawan Boga (EMPLOYEE, LIST OUTLET), dan kode Boga Legal Desk yang sudah ada di repo ini.
-> Status: **menunggu jawaban pertanyaan di §10** sebelum mulai coding.
+> Status: **keputusan terkunci (§10)** · Fase 0 & 1 selesai di branch `claude/ldms-planning-8b9qv0` (§11).
 
 ---
 
@@ -16,7 +16,8 @@ Blueprint ditulis untuk Google Apps Script + Sheets. Kita **pindah ke stack web 
 | File | **Vercel Blob** (scan izin, PDF kontrak, bukti sanksi) | Satu dashboard Vercel; private URL bertanda tangan |
 | AI | **Claude via Vercel AI Gateway** (AI SDK, tool calling) | Tanpa API key di kode; bisa fallback model |
 | Jadwal | **Vercel Cron** → `/api/cron/*` | Ganti time-driven trigger Apps Script |
-| Email | Microsoft Graph (sudah ada) **atau** Gmail/Resend — lihat Q6 | |
+| Email | **Hybrid**: kirim lewat Microsoft Graph dari shared mailbox Legal (M365); penerima boleh Outlook (manajerial) maupun Google Workspace | Penerima tidak harus punya M365; fallback Resend |
+| File kerja | Google Shared Drive (GWS dipakai untuk sharing) — link Drive per dokumen; upload kecil disimpan di DB | Fase 3: tombol "Simpan ke Drive" via service account |
 | Sync karyawan | Google Sheets API (service account, read-only) | Auto-nonaktifkan akun yang resign |
 
 **Strategi repo:** *evolve, bukan rewrite.* Pertahankan auth, `lib/db.ts`, `lib/password.ts`, token warna, komponen UI. Fitur email-intake yang lama dijadikan modul **"Review Kontrak / Dokumen Masuk"** di bawah pilar Library (atau dimatikan — Q1).
@@ -25,7 +26,7 @@ Blueprint ditulis untuk Google Apps Script + Sheets. Kita **pindah ke stack web 
 
 ## 2. Akses & login (sesuai permintaan)
 
-- **Hanya tim Legal** yang bisa login. Sumber kebenaran: sheet karyawan, filter `Dept/Outlet` / `Div/Brand` = Legal (aturan pastinya dikonfirmasi di Q3).
+- **Hanya tim Legal** yang bisa login. Sumber kebenaran: sheet karyawan (tab `EMPLOYEE`). Masuk hitungan bila **Position Title** memuat "Legal" atau "CPLO", **atau** `Dept/Outlet`/`Div/Brand` = Legal (perlu, karena staf permit berjabatan "Permit & Insurance Staff"). Departemen gabungan "Human Capital & Legal" tidak ikut agar tim HC tidak mendapat akses. Pola bisa diubah lewat env tanpa ubah kode.
 - **Username = NIK (`Employee Id`)**, **password awal = tanggal lahir `DDMMYYYY`** dari kolom `Birthdate`.
 - **Login pertama wajib ganti password** (min. 8 karakter, huruf + angka, bukan tanggal lahir, bukan NIK). Kode untuk ini sudah ada.
 - Tanggal lahir **tidak pernah disimpan mentah** — langsung di-hash scrypt; sheet hanya dibaca saat sync.
@@ -36,8 +37,8 @@ Blueprint ditulis untuk Google Apps Script + Sheets. Kita **pindah ke stack web 
 ### Role (usulan, menyesuaikan tim nyata — Q2)
 | Role | Siapa (usulan) | Hak |
 |---|---|---|
-| `director` | Ernica Silaban | Lihat semua, menerima eskalasi H-0/overdue, dashboard |
-| `head` | Belinda Putri Febrianti | Lihat & edit semua, approval, menerima eskalasi H-7 |
+| `cpo` (**CPLO**) | Ernica Silaban | Lihat semua, menerima eskalasi H-0/overdue, dashboard |
+| `agm` (Head) | Belinda Putri Febrianti | Lihat & edit semua, approval, menerima eskalasi H-7 |
 | `manager` | Ronald, Arsy | Lihat & edit semua, approval |
 | `supervisor` | Jala (Permit), Virgy (Corporate) | Full edit, **approval sanksi tahap Legal**, CC tahap-2 reminder |
 | `staff` | Tika, Dola, Salma | Edit dokumen yang PIC-nya dia; lihat semua (read-only) |
@@ -203,5 +204,40 @@ Tiap fase: commit ke branch ini → Vercel preview → user cek → lanjut.
 
 ---
 
-## 10. Pertanyaan terbuka
-Lihat pesan chat — jawaban akan dicatat di sini.
+## 10. Keputusan (1 Nov 2026)
+| # | Topik | Keputusan |
+|---|---|---|
+| 1 | Fitur email intake lama | Dipertahankan sebagai **Review Kontrak** (`/kontrak`) di grup History & Library |
+| 2 | Role | Ernica = **CPLO**, Belinda = AGM/Head, Ronald & Arsy = Manager, Jala & Virgy = Supervisor (approver sanksi tahap Legal), Tika, Dola, Salma = Staff |
+| 3 | Siapa tim Legal | Dari sheet karyawan: Position Title "Legal"/"CPLO" + departemen Legal (lihat §2). Pratinjau wajib dicek sekali sebelum sinkron pertama |
+| 4 | Approval HR sanksi | Link aman ber-token di email (HR tanpa akun LDMS) |
+| 5 | Database | Neon (Vercel) + file kecil di Postgres; Blob/Drive saat volume naik |
+| 6 | Email | Hybrid M365 (manajerial) + GWS (staff, fokus Drive) → kirim via Graph dari mailbox Legal ke alamat mana pun; Drive untuk berbagi file |
+| 7 | Data registry | Demo dulu (14 unit, 178 izin); importer Excel menyusul |
+| 8 | Knowledge Base | **Tetap di Google Docs**. *KB Agent* dipicu setiap Docs berubah: Drive push notification (`files.watch`, diperpanjang tiap hari) → webhook `/api/kb/webhook` → baca Docs API → parse 7 heading → upsert `kb_cases` → AI cek nama/identitas, cocokkan kode matrix, tandai heading kurang → embedding untuk pencarian. Fallback: cron membandingkan `headRevisionId` bila notifikasi terlewat |
+| 9 | Gaya | Ikut blueprint (§13) di atas token warna repo yang ada |
+| 10 | Urutan | Fondasi → Perizinan → Reminder + Tanya LDMS (perizinan) → dst. |
+
+## 11. Progres
+**Fase 0 — selesai**
+- Role `supervisor` baru; Jala & Virgy → Supervisor; Ernica tetap CPLO.
+- Schema v8: `brands`, `units`, `permit_types`, `permits`, `permit_periods`, `notes`, `files`, `reminders`, `audit_log` (idempotent, aman untuk DB v7 yang sudah jalan).
+- Sinkron karyawan dari Google Sheet (service account, tanpa SDK): pratinjau perubahan di Pengaturan → Tim & akses, tombol "Sinkron sekarang", dan otomatis di cron harian. Akun baru: password awal = tanggal lahir (hash), wajib ganti. Resign / bukan Legal lagi → akses dicabut. Peran akun yang ada tidak pernah diubah sync. Batal otomatis bila sheet tidak mengembalikan satu pun karyawan Legal.
+- Navigasi baru per pilar + badge "perlu tindakan"; modul yang belum dibangun diberi label *Segera* dengan halaman penjelasan.
+- Beranda baru: KPI (izin aktif, overdue, ≤30 hari + estimasi biaya, somasi belum ack, compliance), "Perlu tindakan Anda", "Perlu perhatian tim", compliance per brand, aktivitas terakhir.
+
+**Fase 1 — selesai (data contoh)**
+- 29 jenis izin master (26 dari Excel + NIB, Halal, Izin Alkohol) dengan ambang renewal, masa berlaku, instansi, estimasi biaya, blocker.
+- Registry: filter cepat (Perlu tindakan, Overdue, ≤30 hari, Bersomasi, Belum diproses), cari teks (termasuk isi catatan & somasi), filter PIC/brand/scope/status; staff default melihat dokumen miliknya.
+- Drawer detail: status renewal 3 tahap + **Tandai terbit** (periode lama diarsipkan, siklus baru otomatis), somasi & acknowledge, catatan bernama + waktu, upload file, tangga reminder, riwayat lengkap (audit + periode).
+- Hak akses: staff hanya mengubah izin miliknya; somasi ditandai/dicabut Supervisor ke atas.
+
+**Berikutnya — Fase 2:** reminder engine (tangga H-lead → overdue + somasi harian, email Legal-only, anti-duplikat, ack via link email), weekly digest, importer Excel registry, dan **Tanya LDMS v1** (tools perizinan).
+
+### Setup yang dibutuhkan di Vercel
+| Env | Untuk |
+|---|---|
+| `DATABASE_URL` | Neon (otomatis saat integrasi Neon dihubungkan) |
+| `AUTH_SECRET`, `CRON_SECRET` | Sesi login & proteksi cron |
+| `GOOGLE_SERVICE_ACCOUNT_JSON`, `EMPLOYEE_SHEET_ID` | Sinkron tim Legal (share sheet ke email service account sebagai Viewer) |
+| `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_MAILBOX` | Kirim email reminder (Fase 2) |

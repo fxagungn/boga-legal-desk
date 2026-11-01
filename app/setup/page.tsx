@@ -15,7 +15,7 @@ export default function SetupPage() {
       <div className="card w-full max-w-lg p-7">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.svg" alt="" className="mb-5 h-10 w-10" />
-        <h1 className="text-2xl font-bold tracking-tight">Siapkan Boga Legal Desk</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Siapkan Boga LDMS</h1>
         <p className="mt-1 text-ink-2">Dua langkah lagi sebelum tim bisa masuk.</p>
         <ol className="mt-6 space-y-4">
           {steps.map((s) => (

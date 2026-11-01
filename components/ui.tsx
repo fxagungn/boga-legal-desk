@@ -12,8 +12,8 @@ export function Logo({ sub = true }: { sub?: boolean }) {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/logo.svg" alt="" className="h-8 w-8" />
       <span className="leading-tight">
-        <span className="block text-[15px] font-extrabold tracking-tight">Boga Legal Desk</span>
-        {sub && <span className="block text-[11px] font-semibold text-ink-3">Dokumen legal, terpantau</span>}
+        <span className="block text-[15px] font-extrabold tracking-tight">Boga LDMS</span>
+        {sub && <span className="block text-[11px] font-semibold text-ink-3">Legal Document Management</span>}
       </span>
     </Link>
   );

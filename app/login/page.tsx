@@ -13,14 +13,14 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <div className="relative hidden flex-col justify-between overflow-hidden bg-brand p-12 text-white lg:flex">
         <div className="flex items-center gap-2.5">
           <span className="grid h-9 w-9 place-items-center rounded-lg bg-white/15 text-[18px] font-extrabold">B</span>
-          <span className="text-[16px] font-extrabold">Boga Legal Desk</span>
+          <span className="text-[16px] font-extrabold">Boga LDMS</span>
         </div>
         <div className="max-w-md">
-          <p className="text-[32px] leading-tight font-extrabold tracking-tight">Setiap dokumen legal kelihatan ada di meja siapa.</p>
+          <p className="text-[32px] leading-tight font-extrabold tracking-tight">Tidak ada izin yang lewat jatuh tempo tanpa ketahuan.</p>
           <ul className="mt-6 space-y-2.5 text-[15px] text-white/85">
-            <li>Email masuk langsung jadi dokumen</li>
-            <li>Urutan prioritas dihitung otomatis</li>
-            <li>Persetujuan cukup satu ketukan dari HP</li>
+            <li>Perizinan, perjanjian, dan sanksi dalam satu tempat</li>
+            <li>Reminder bertingkat otomatis, hanya ke tim Legal</li>
+            <li>Tanya LDMS: jawaban AI dengan ID dokumen sumbernya</li>
           </ul>
         </div>
         <p className="text-[13px] text-white/60">Tim Legal · Boga Group</p>
@@ -30,10 +30,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <div className="w-full max-w-sm">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.svg" alt="" className="mb-6 h-10 w-10 lg:hidden" />
-          <p className="text-[12.5px] font-bold tracking-[0.08em] text-brand uppercase">Boga Legal Desk</p>
+          <p className="text-[12.5px] font-bold tracking-[0.08em] text-brand uppercase">Boga Group · Tim Legal</p>
           <h1 className="mt-2 text-[26px] leading-tight font-extrabold tracking-tight text-balance">Welcome to Legal Document Management System</h1>
           <p className="mt-3 text-[14.5px] leading-relaxed text-ink-2">
-            Satu tempat untuk memantau dokumen legal Boga Group, mulai dari permintaan masuk lewat email, review, persetujuan, sampai tanda tangan. Progres dan posisi setiap dokumen bisa dilihat semua tim.
+            Registry perizinan outlet, Central Kitchen, dan korporat; perjanjian MLA, ULA, PKS, PSM; pencatatan sanksi berbasis Matrix Disiplin; dan pengetahuan legal tim — khusus tim Legal Boga Group.
           </p>
           <div className="mt-7 mb-5 border-t border-line pt-6">
             <h2 className="text-[17px] font-bold">Masuk</h2>
@@ -42,7 +42,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           {settings.maintenance && <p className="mb-4 rounded-lg bg-warn-bg px-3 py-2 text-[13.5px] text-warn">{settings.maintenanceMessage}</p>}
           {settings.uatMode && <p className="mb-4 rounded-lg bg-info-bg px-3 py-2 text-[13.5px] text-info">Mode UAT aktif: ini lingkungan uji coba.</p>}
           <LoginForm next={next} />
-          <p className="mt-6 text-[13px] text-ink-3">Lupa password atau akun terkunci? Hubungi Manager Legal untuk reset.</p>
+          <p className="mt-6 text-[13px] text-ink-3">Lupa password atau akun terkunci? Hubungi Manager Legal untuk reset ke tanggal lahir.</p>
         </div>
       </div>
     </div>

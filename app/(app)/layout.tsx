@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { FlaskConical, KeyRound, LogOut, Wrench } from "lucide-react";
-import { getSettings } from "@/lib/db";
+import { getSettings, query } from "@/lib/db";
 import { BottomNav, SideNav } from "@/components/Nav";
 import { Toaster } from "@/components/actions";
 import { canBypassMaintenance, currentMember } from "@/lib/repo";
@@ -15,6 +15,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!me) redirect("/login");
   if (me.must_change_password) redirect("/ganti-password");
   const settings = await getSettings();
+  // Sidebar badge: my permits that need action (in renewal window, or somasi not yet acknowledged).
+  const [mine] = await query<{ n: number }>(
+    `select count(*)::int as n from permits p join permit_types t on t.id = p.permit_type_id join units u on u.id = p.unit_id
+     where u.status = 'aktif' and p.pic_id = $1 and ((p.expiry_date - (now() at time zone 'Asia/Jakarta')::date) <= t.lead_days or (p.requires_ack and p.ack_at is null))`,
+    [me.id],
+  );
+  const badges = { "/perizinan": mine?.n ?? 0 };
 
   if (settings.maintenance && !canBypassMaintenance(me)) {
     return (
@@ -33,7 +40,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen md:grid md:grid-cols-[248px_1fr]">
       <aside className="hidden border-r border-line bg-surface md:sticky md:top-0 md:flex md:h-screen md:flex-col md:px-4 md:py-5">
         <div className="mb-6 px-1"><Logo /></div>
-        <SideNav />
+        <SideNav badges={badges} />
         <div className="mt-auto flex items-center gap-2.5 rounded-xl border border-line px-3 py-2.5">
           <Avatar name={me.name} size={32} />
           <div className="min-w-0 flex-1 leading-tight">
@@ -73,7 +80,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         )}
         {children}
       </main>
-      <BottomNav />
+      <BottomNav badges={badges} />
       <Toaster />
     </div>
   );

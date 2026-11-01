@@ -95,7 +95,7 @@ export async function listAttachments(docId: number) {
 
 export async function listMembers(activeOnly = false) {
   return query<Member>(`select id, name, role, email, whatsapp, active, title, nik, must_change_password, password_hash is not null as has_password, last_login_at from team_members ${activeOnly ? "where active" : ""} order by
-    case role when 'staff' then 1 when 'manager' then 2 when 'agm' then 3 when 'cpo' then 4 else 5 end, name`);
+    case role when 'staff' then 1 when 'supervisor' then 2 when 'manager' then 3 when 'agm' then 4 when 'cpo' then 5 else 6 end, name`);
 }
 
 export async function getMember(id: number) {
@@ -119,7 +119,7 @@ export async function pickAssignee(): Promise<number | null> {
   const r = await one<{ id: number }>(
     `select m.id from team_members m
      left join documents d on d.assignee_id = m.id and d.status in ('active','on_hold')
-     where m.active and m.role = 'staff'
+     where m.active and m.role in ('staff','supervisor')
      group by m.id order by count(d.id) asc, m.id asc limit 1`,
   );
   return r?.id ?? null;

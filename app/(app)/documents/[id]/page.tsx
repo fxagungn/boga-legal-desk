@@ -50,7 +50,7 @@ export default async function DocumentPage({ params, searchParams }: { params: P
 
   return (
     <div className="mx-auto max-w-[1180px]">
-      <Link href="/" className="mb-4 inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-ink-2 hover:text-ink"><ArrowLeft size={16} /> Beranda</Link>
+      <Link href="/kontrak" className="mb-4 inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-ink-2 hover:text-ink"><ArrowLeft size={16} /> Review Kontrak</Link>
 
       <header className="mb-5">
         <div className="flex flex-wrap items-center gap-2">

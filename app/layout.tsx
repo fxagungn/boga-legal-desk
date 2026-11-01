@@ -7,8 +7,8 @@ import "@fontsource/plus-jakarta-sans/latin-800.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Boga Legal Desk",
-  description: "Pantau dokumen legal Boga Group dari email sampai tanda tangan.",
+  title: "Boga LDMS",
+  description: "Legal Document Management System Boga Group — perizinan, perjanjian, sanksi, dan pengetahuan legal dalam satu tempat.",
 };
 
 export const viewport: Viewport = { themeColor: "#ffffff", width: "device-width", initialScale: 1 };

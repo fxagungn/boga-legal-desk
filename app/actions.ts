@@ -135,7 +135,7 @@ export async function revisionAction(_: Result, f: FormData): Promise<Result> {
 export async function moveAction(_: Result, f: FormData): Promise<Result> {
   return run(async () => {
     const { me, doc, wf } = await loadForAction(f);
-    if (me.role === "staff" || me.role === "cpo") throw new Error("Memindahkan tahap secara manual hanya untuk Manager, AGM, atau Admin.");
+    if (me.role === "staff" || me.role === "supervisor" || me.role === "cpo") throw new Error("Memindahkan tahap secara manual hanya untuk Manager, AGM, atau Admin.");
     const to = str(f, "stage");
     if (!stageDef(wf, doc.doc_type, to)) throw new Error("Tahap tidak valid");
     await moveToStage(doc.id, to, me.name, { type: "moved", message: str(f, "note") || "Dipindah manual" });
@@ -162,7 +162,7 @@ export async function resumeAction(_: Result, f: FormData): Promise<Result> {
 export async function cancelAction(_: Result, f: FormData): Promise<Result> {
   return run(async () => {
     const { me, doc } = await loadForAction(f);
-    if (me.role === "staff") throw new Error("Pembatalan butuh Manager ke atas.");
+    if (me.role === "staff" || me.role === "supervisor") throw new Error("Pembatalan butuh Manager ke atas.");
     await query(`update documents set status='cancelled', completed_at=now(), updated_at=now() where id=$1`, [doc.id]);
     await logEvent(doc.id, { type: "cancelled", actor: me.name, message: str(f, "reason") || "Dibatalkan" });
     done(doc.id);
@@ -440,6 +440,23 @@ export async function deleteDemoAction(_?: Result, _f?: FormData): Promise<Resul
   return run(async () => {
     await requireLead();
     await query(`delete from documents where is_demo`);
+    // Demo permit registry: permits first (notes/files are keyed by entity), then units that only held demo data.
+    await query(`delete from notes where entity = 'permit' and entity_id in (select id from permits where is_demo)`);
+    await query(`delete from files where entity = 'permit' and entity_id in (select id from permits where is_demo)`);
+    await query(`delete from permits where is_demo`);
+    await query(`delete from units u where u.is_demo and not exists (select 1 from permits p where p.unit_id = u.id)`);
     revalidatePath("/", "layout");
+  });
+}
+
+/* ---------- employee sheet sync ---------- */
+
+export async function applyEmployeeSyncAction(_?: Result, _f?: FormData): Promise<Result> {
+  return run(async () => {
+    const me = await requireLead();
+    const { applySync } = await import("@/lib/employees");
+    const r = await applySync(me.name);
+    revalidatePath("/settings");
+    return `Sinkron selesai: ${r.created} akun baru, ${r.linked} ditautkan, ${r.deactivated} dinonaktifkan`;
   });
 }

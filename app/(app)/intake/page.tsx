@@ -72,7 +72,7 @@ export default async function Intake({ searchParams }: { searchParams: Promise<{
             <div><label className="label" htmlFor="m-val">Nilai kontrak (Rp)</label><input id="m-val" name="contract_value" inputMode="numeric" className="input" placeholder="Opsional" /></div>
             <div><label className="label" htmlFor="m-dl">Deadline</label><input id="m-dl" name="deadline" type="date" className="input" /></div>
             <div><label className="label" htmlFor="m-pic">PIC</label>
-              <select id="m-pic" name="assignee_id" className="input"><option value="">Otomatis (yang paling sedikit tugasnya)</option>{members.filter((m) => m.role === "staff").map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div>
+              <select id="m-pic" name="assignee_id" className="input"><option value="">Otomatis (yang paling sedikit tugasnya)</option>{members.filter((m) => m.role === "staff" || m.role === "supervisor").map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div>
             <div><label className="label" htmlFor="m-risk">Tingkat risiko</label>
               <select id="m-risk" name="risk_level" defaultValue="medium" className="input">{(["low", "medium", "high"] as const).map((k) => <option key={k} value={k}>{RISK_LABEL[k]}</option>)}</select></div>
             <div className="sm:col-span-2"><label className="label" htmlFor="m-req">Peminta</label><input id="m-req" name="requester_name" className="input" placeholder="Nama / divisi" /></div>

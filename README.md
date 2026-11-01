@@ -1,4 +1,10 @@
-# Boga Legal Desk
+# Boga LDMS — Legal Document Management System
+
+Aplikasi internal tim Legal Boga Group: registry perizinan dengan reminder bertingkat, perjanjian MLA/ULA/PKS/PSM, sanksi berbasis Matrix Disiplin, pemeriksaan instansi, pustaka & knowledge base, dan asisten AI "Tanya LDMS". Rencana lengkap & progres: [`docs/LDMS_PLAN.md`](docs/LDMS_PLAN.md).
+
+Login hanya untuk tim Legal (disinkron harian dari sheet karyawan): **NIK** + password awal **tanggal lahir (DDMMYYYY)**, wajib diganti saat login pertama.
+
+## Modul Review Kontrak (email intake)
 
 Pelacak dokumen legal yang diisi otomatis dari email Outlook. Setiap email bersubjek `[LEGAL]` menjadi dokumen dengan PIC, workflow per jenis (kontrak vendor, kontrak prinsipal, lainnya), SLA per tahap dalam hari kerja WIB, skor prioritas yang bisa dijelaskan, proyeksi jadwal, serta reminder dan eskalasi via email dan WhatsApp.
 

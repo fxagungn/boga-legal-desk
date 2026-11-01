@@ -24,6 +24,15 @@ export async function GET(req: NextRequest) {
       out.syncError = e instanceof Error ? e.message : String(e);
     }
   }
+  // 1) Legal team from the employee sheet (new joiners get an account, resigned people lose access).
+  const { employeeSyncConfigured, applySync } = await import("@/lib/employees");
+  if (employeeSyncConfigured()) {
+    try {
+      out.employees = await applySync();
+    } catch (e) {
+      out.employeesError = e instanceof Error ? e.message : String(e);
+    }
+  }
   out.daily = await runDaily();
   return NextResponse.json(out);
 }

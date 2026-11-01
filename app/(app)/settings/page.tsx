@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CheckCircle2, Circle, FlaskConical, KeyRound, Wrench } from "lucide-react";
+import { CheckCircle2, Circle, FlaskConical, KeyRound, RefreshCw, Wrench } from "lucide-react";
 import { getKV, getSettings, query } from "@/lib/db";
 import { currentMember, listMembers } from "@/lib/repo";
 import { graphConfigured, mailbox } from "@/lib/graph";
@@ -12,6 +12,8 @@ import { Avatar, Card, cx, Notice, PageHeader } from "@/components/ui";
 import { ActionButton, ActionDialog, ActionForm, Submit } from "@/components/actions";
 import { WorkflowEditor } from "@/components/WorkflowEditor";
 import * as A from "@/app/actions";
+import { employeeSheetId, employeeSyncConfigured, lastSync, planSync } from "@/lib/employees";
+import { googleAccountEmail } from "@/lib/google";
 
 export const dynamic = "force-dynamic";
 
@@ -43,15 +45,16 @@ function Toggle({ name, defaultChecked, disabled, title, desc, icon: Icon, tone 
   );
 }
 
-export default async function Settings({ searchParams }: { searchParams: Promise<{ tab?: Tab }> }) {
-  const tab: Tab = (await searchParams).tab ?? "tim";
+export default async function Settings({ searchParams }: { searchParams: Promise<{ tab?: Tab; preview?: string }> }) {
+  const sp = await searchParams;
+  const tab: Tab = sp.tab ?? "tim";
   const [me, settings, members, sub, lastDaily, demo, usageRows] = await Promise.all([
     currentMember(),
     getSettings(),
     listMembers(),
     getKV<{ id: string; expiration: string }>("graph_subscription"),
     getKV<{ at: string; breaches: number; escalations: number }>("last_daily"),
-    query<{ n: number }>(`select count(*)::int as n from documents where is_demo`),
+    query<{ n: number }>(`select ((select count(*) from documents where is_demo) + (select count(*) from permits where is_demo))::int as n`),
     query<{ doc_type: string; stage: string; n: number }>(`select doc_type, stage, count(*)::int as n from documents where status in ('active','on_hold') group by 1, 2`),
   ]);
   const lead = Boolean(me && ["manager", "agm", "admin"].includes(me.role));
@@ -81,6 +84,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
 
       {tab === "tim" && (
         <div className="space-y-5">
+          <SyncCard lead={lead} preview={sp.preview === "1"} />
           <Notice tone="info">
             Login memakai <b>NIK</b>. Password awal adalah <b>tanggal lahir (DDMMYYYY)</b>, misalnya 17 Agustus 1990 → <code>17081990</code>, dan wajib diganti saat login pertama.
           </Notice>
@@ -204,7 +208,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
             </ActionForm>
             {lead && demo[0]?.n > 0 && (
               <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-line-2 pt-4 text-[14px]">
-                <span className="flex-1 text-ink-2">Ada <b className="text-ink">{demo[0].n} dokumen</b> contoh/uji (dibuat saat UAT atau data contoh awal).</span>
+                <span className="flex-1 text-ink-2">Ada <b className="text-ink">{demo[0].n} dokumen</b> contoh/uji (kontrak dan registry perizinan contoh, atau dibuat saat UAT).</span>
                 <ActionButton action={A.deleteDemoAction} id={0} className="btn btn-sm btn-danger" success="Data uji dihapus" pending="Menghapus…">Hapus data uji</ActionButton>
               </div>
             )}
@@ -234,6 +238,65 @@ export default async function Settings({ searchParams }: { searchParams: Promise
           </Card>
         </div>
       )}
+    </div>
+  );
+}
+
+async function SyncCard({ lead, preview }: { lead: boolean; preview: boolean }) {
+  const last = await lastSync();
+  if (!employeeSyncConfigured()) {
+    return (
+      <Card title="Sinkron dari data karyawan" action={<RefreshCw size={18} className="text-ink-3" />}>
+        <p className="text-[14px] text-ink-2">Belum tersambung. Akun tim Legal akan dibuat & dinonaktifkan otomatis dari sheet karyawan Boga (jabatan/departemen Legal dan CPLO) setiap pagi.</p>
+        <ol className="mt-3 list-decimal space-y-1 pl-5 text-[13.5px] text-ink-2">
+          <li>Buat service account di Google Cloud, aktifkan Google Sheets API, unduh key JSON.</li>
+          <li>Isi env Vercel <code>GOOGLE_SERVICE_ACCOUNT_JSON</code> (isi file JSON) dan <code>EMPLOYEE_SHEET_ID</code>.</li>
+          <li>Share sheet karyawan ke email service account sebagai <b>Viewer</b>, lalu redeploy.</li>
+        </ol>
+      </Card>
+    );
+  }
+  let plan: Awaited<ReturnType<typeof planSync>> | null = null;
+  let err: string | null = null;
+  if (preview) {
+    try { plan = await planSync(); } catch (e) { err = e instanceof Error ? e.message : String(e); }
+  }
+  const changes = plan ? plan.create.length + plan.link.length + plan.update.length + plan.deactivate.length : 0;
+  return (
+    <Card title="Sinkron dari data karyawan" sub={<>Sheet <code className="text-[12px]">{employeeSheetId().slice(0, 10)}…</code> dibaca sebagai {googleAccountEmail()}. Otomatis tiap pagi.</>}
+      action={<RefreshCw size={18} className="text-ink-3" />}>
+      <p className="text-[14px] text-ink-2">
+        {last ? <>Terakhir {formatDateTime(last.at)} oleh {last.actor ?? "sistem"}: {last.legal} karyawan Legal aktif · {last.created} akun baru · {last.deactivated} dinonaktifkan.</> : "Belum pernah dijalankan."}
+      </p>
+      {err && <p className="mt-3 rounded-lg bg-bad-bg px-3 py-2 text-[13px] text-bad">{err}</p>}
+      {plan && (
+        <div className="mt-4 space-y-3 rounded-xl border border-line bg-bg p-4 text-[13.5px]">
+          <p className="font-semibold">{plan.legal} karyawan aktif cocok (dari {plan.scanned.toLocaleString("id-ID")} baris). {changes === 0 ? "Tidak ada perubahan." : `${changes} perubahan:`}</p>
+          {plan.create.length > 0 && <Diff title="Akun baru (password awal = tanggal lahir)" items={plan.create.map((e) => `${e.name} · ${e.nik} · ${e.title} → ${ROLE_LABEL[e.role]}`)} />}
+          {plan.link.length > 0 && <Diff title="Ditautkan ke NIK" items={plan.link.map((l) => `${l.name} → ${l.emp.nik}`)} />}
+          {plan.update.length > 0 && <Diff title="Diperbarui" items={plan.update.map((u) => `${u.name}: ${u.changes.join(", ")}`)} />}
+          {plan.deactivate.length > 0 && <Diff title="Akses dicabut" tone="bad" items={plan.deactivate.map((d) => `${d.name} — ${d.reason}`)} />}
+          {plan.inactiveInApp.length > 0 && <Diff title="Aktif di HR tapi dinonaktifkan manual di LDMS (tidak diubah)" items={plan.inactiveInApp.map((m) => m.name)} />}
+          {plan.noBirth.length > 0 && <Diff title="Tanggal lahir kosong/tidak terbaca — reset password manual" tone="bad" items={plan.noBirth} />}
+          <p className="text-[12.5px] text-ink-3">Peran akun yang sudah ada tidak pernah diubah oleh sync. Tanggal lahir tidak disimpan.</p>
+        </div>
+      )}
+      {lead && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {!preview && <Link href="/settings?preview=1" className="btn btn-sm">Pratinjau perubahan</Link>}
+          {(!preview || changes > 0) && <ActionButton action={A.applyEmployeeSyncAction} id={0} className="btn btn-sm btn-primary" pending="Menyinkron…">Sinkron sekarang</ActionButton>}
+          {preview && <Link href="/settings" className="btn btn-sm btn-ghost">Tutup pratinjau</Link>}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function Diff({ title, items, tone }: { title: string; items: string[]; tone?: "bad" }) {
+  return (
+    <div>
+      <p className={cx("text-[12px] font-bold tracking-wide uppercase", tone === "bad" ? "text-bad" : "text-ink-3")}>{title}</p>
+      <ul className="mt-1 list-disc pl-5">{items.map((i) => <li key={i}>{i}</li>)}</ul>
     </div>
   );
 }

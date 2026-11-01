@@ -92,7 +92,7 @@ export async function runDaily() {
     for (const m of members) {
       const mine = scored.filter(({ d }) => {
         const st = stageDef(settings.workflows, d.doc_type, d.stage);
-        if (m.role === "staff") return d.assignee_id === m.id;
+        if (m.role === "staff" || m.role === "supervisor") return d.assignee_id === m.id;
         if (st?.approval) return st.role === m.role;
         return m.role === "manager" || m.role === "admin";
       });

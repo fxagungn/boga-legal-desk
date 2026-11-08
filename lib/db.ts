@@ -175,7 +175,6 @@ export function ensureSchema(): Promise<void> {
       }
       for (const stmt of MIGRATION) await q.query(stmt);
       await seedIfEmpty();
-      await attachDemoDrafts();
       await applyTeamRoster();
       await (await import("./ldms/seed")).seedLdms(q);
       await q.query(
@@ -334,26 +333,6 @@ async function applyTeamRoster() {
   }
 }
 
-/** v5: give demo documents a draft PDF so the preview has something to show. */
-async function attachDemoDrafts() {
-  const q = raw();
-  const docs = (await q.query(
-    `select d.id, d.code, d.title, d.counterparty, d.summary, d.key_points from documents d
-     where d.is_demo and not exists (select 1 from attachments a where a.document_id = d.id)`,
-  )) as { id: number; code: string; title: string; counterparty: string | null; summary: string | null; key_points: string[] }[];
-  if (!docs.length) return;
-  const { demoContract } = await import("./pdf");
-  const { createHash } = await import("node:crypto");
-  for (const d of docs) {
-    const pdf = demoContract({ ...d, points: d.key_points ?? [] });
-    await q.query(
-      `insert into attachments (document_id, filename, content_type, size, sha256, data)
-       values ($1, $2, 'application/pdf', $3, $4, decode($5, 'base64')) on conflict do nothing`,
-      [d.id, `Draft ${d.title}.pdf`, pdf.byteLength, createHash("sha256").update(pdf).digest("hex"), Buffer.from(pdf).toString("base64")],
-    );
-  }
-}
-
 async function seedIfEmpty() {
   const q = raw();
   // Only one instance may seed, even when several cold-start at once.
@@ -375,44 +354,5 @@ async function seedIfEmpty() {
   for (const [name, role] of team) {
     const r = (await q.query(`insert into team_members (name, role) values ($1, $2) returning id`, [name, role])) as { id: number }[];
     ids.push(r[0].id);
-  }
-
-  if (process.env.SEED_DEMO === "false") return;
-
-  const now = Date.now();
-  const d = (days: number) => new Date(now + days * 86_400_000);
-  const date = (days: number) => d(days).toISOString().slice(0, 10);
-  const demo = [
-    { title: "Perjanjian Supply Daging Sapi 2027", type: "vendor", cp: "PT Sumber Protein Nusantara", value: 4_800_000_000, dl: 4, stage: "mgr_approval", entered: -3.2, risk: "high", urgent: true, who: 0, summary: "Kontrak pasokan daging sapi untuk seluruh outlet selama 2027 dengan mekanisme penyesuaian harga per kuartal.", points: ["Penyesuaian harga kuartalan tanpa batas atas", "Denda keterlambatan pasokan hanya 0,1%/hari", "Eksklusivitas pemasok untuk wilayah Jabodetabek"] },
-    { title: "Perjanjian Lisensi Merek Kopi", type: "principal", cp: "Bean Origin Holdings Pte. Ltd.", value: 12_000_000_000, dl: 20, stage: "negotiation", entered: -2, risk: "high", urgent: false, who: 1, summary: "Lisensi penggunaan merek dan resep untuk 25 gerai baru, termasuk royalti 6% dari penjualan bersih.", points: ["Target pembukaan 25 gerai dalam 24 bulan", "Hukum yang berlaku: Singapura", "Terminasi sepihak oleh prinsipal bila target tidak tercapai"] },
-    { title: "Kontrak Jasa Kebersihan Outlet", type: "vendor", cp: "CV Bersih Selalu", value: 360_000_000, dl: 12, stage: "review", entered: -4.5, risk: "low", urgent: false, who: 0, summary: "Jasa kebersihan harian untuk 18 outlet dengan masa kontrak 12 bulan.", points: ["Perpanjangan otomatis 12 bulan", "Tidak ada klausul asuransi tanggung gugat"] },
-    { title: "Addendum Sewa Mesin Espresso", type: "vendor", cp: "PT Mesin Seduh Indonesia", value: 220_000_000, dl: 30, stage: "intake", entered: -0.3, risk: "medium", urgent: false, who: null, summary: "Addendum penambahan 10 unit mesin dan perubahan biaya servis.", points: ["Biaya servis naik 15%"] },
-    { title: "Perjanjian Distribusi Saus Prinsipal Jepang", type: "principal", cp: "Kaneda Foods Co., Ltd.", value: 2_500_000_000, dl: -1, stage: "agm_approval", entered: -2.6, risk: "medium", urgent: true, who: 1, summary: "Penunjukan distributor eksklusif saus dan bumbu untuk pasar Indonesia.", points: ["Minimum order tahunan", "Wajib registrasi BPOM oleh distributor"] },
-    { title: "Kontrak Software POS", type: "vendor", cp: "PT Kasir Digital", value: 950_000_000, dl: 9, stage: "signing", entered: -1, risk: "medium", urgent: false, who: 0, summary: "Langganan sistem POS 3 tahun untuk semua brand.", points: ["Data pelanggan disimpan di luar negeri", "SLA uptime 99,5%"] },
-    { title: "NDA Kerja Sama Pemasok Kemasan", type: "other", cp: "PT Kemasan Hijau", value: null, dl: null, stage: "review", entered: -1.5, risk: "low", urgent: false, who: 1, summary: "NDA dua arah sebelum diskusi kemasan ramah lingkungan.", points: [] },
-  ];
-
-  for (const [i, x] of demo.entries()) {
-    const code = `LGL-${new Date().getFullYear()}-${String(i + 1).padStart(4, "0")}`;
-    await q.query(`select nextval('doc_code_seq')`);
-    const r = (await q.query(
-      `insert into documents (code, title, doc_type, counterparty, contract_value, deadline, urgent, risk_level, stage, assignee_id,
-        requester_name, requester_email, summary, key_points, source, stage_entered_at, last_activity_at, created_at, is_demo, normalized_subject)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,'email',$15,$15,$16,true,$17) returning id`,
-      [
-        code, x.title, x.type, x.cp, x.value, x.dl === null ? null : date(x.dl), x.urgent, x.risk, x.stage,
-        x.who === null ? null : ids[x.who], "Tim Procurement", "procurement@contoh.co.id", x.summary, JSON.stringify(x.points),
-        d(x.entered), d(x.entered - 6), x.title.toLowerCase(),
-      ],
-    )) as { id: number }[];
-    await q.query(
-      `insert into events (document_id, type, actor, message, created_at) values ($1, 'created', 'Sistem', 'Dibuat dari email (data contoh)', $2)`,
-      [r[0].id, d(x.entered - 6)],
-    );
-    await q.query(
-      `insert into emails (document_id, message_id, subject, from_name, from_email, received_at, body_text, source)
-       values ($1, $2, $3, 'Tim Procurement', 'procurement@contoh.co.id', $4, $5, 'demo')`,
-      [r[0].id, `demo-${code}@legal-desk`, `[LEGAL][${x.type === "principal" ? "PRINSIPAL" : "VENDOR"}] ${x.title} - ${x.cp}`, d(x.entered - 6), `Dear Tim Legal,\n\nMohon review untuk ${x.title} dengan ${x.cp}.\n\n${x.summary}\n\nTerima kasih.`],
-    );
   }
 }

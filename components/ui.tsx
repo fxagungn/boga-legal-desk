@@ -1,8 +1,5 @@
 import Link from "next/link";
-import type { PriorityLevel } from "@/lib/insight";
-import { PRIORITY } from "@/lib/labels";
 import { initials } from "@/lib/format";
-import { STATUS_LABEL, type DocStatus } from "@/lib/workflow";
 
 export const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(" ");
 
@@ -17,21 +14,6 @@ export function Logo({ sub = true }: { sub?: boolean }) {
       </span>
     </Link>
   );
-}
-
-export function PriorityChip({ level, title }: { level: PriorityLevel; title?: string }) {
-  const p = PRIORITY[level];
-  return <span title={title ?? p.hint} className={cx("chip", p.className)}>{p.label}</span>;
-}
-
-const STATUS_STYLE: Record<DocStatus, string> = {
-  active: "bg-info-bg text-info",
-  on_hold: "bg-warn-bg text-warn",
-  done: "bg-ok-bg text-ok",
-  cancelled: "bg-mute-bg text-ink-2",
-};
-export function StatusChip({ status }: { status: DocStatus }) {
-  return <span className={cx("chip", STATUS_STYLE[status])}>{STATUS_LABEL[status]}</span>;
 }
 
 export function Avatar({ name, size = 28, tone = "ink" }: { name?: string | null; size?: number; tone?: "ink" | "brand" | "warn" | "mute" }) {
@@ -64,16 +46,10 @@ export function Card({ title, sub, action, children, className, pad = true }: { 
   );
 }
 
-export function PageHeader({ title, sub, children }: { title: string; sub?: React.ReactNode; children?: React.ReactNode }) {
-  return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-      <div className="min-w-0">
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-        {sub && <p className="mt-1 text-ink-2">{sub}</p>}
-      </div>
-      {children && <div className="flex flex-wrap gap-2">{children}</div>}
-    </div>
-  );
+/** The page title lives in the top bar (see Nav/TopBar); this renders the page's own actions, if any. */
+export function PageHeader({ children }: { title?: string; sub?: React.ReactNode; children?: React.ReactNode }) {
+  if (!children) return null;
+  return <div className="mb-4 flex flex-wrap justify-end gap-2">{children}</div>;
 }
 
 export function Notice({ tone = "info", children, action }: { tone?: "info" | "warn" | "brand" | "ok"; children: React.ReactNode; action?: React.ReactNode }) {

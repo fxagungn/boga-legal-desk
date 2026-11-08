@@ -9,41 +9,23 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const settings = await getSettings();
   const { next = "/" } = await searchParams;
   return (
-    <div className="grid min-h-screen lg:grid-cols-[1fr_1.1fr]">
-      <div className="relative hidden flex-col justify-between overflow-hidden bg-brand p-12 text-white lg:flex">
-        <div className="flex items-center gap-2.5">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-white/15 text-[18px] font-extrabold">B</span>
-          <span className="text-[16px] font-extrabold">Boga LDMS</span>
-        </div>
-        <div className="max-w-md">
-          <p className="text-[32px] leading-tight font-extrabold tracking-tight">Tidak ada izin yang lewat jatuh tempo tanpa ketahuan.</p>
-          <ul className="mt-6 space-y-2.5 text-[15px] text-white/85">
-            <li>Perizinan, perjanjian, dan sanksi dalam satu tempat</li>
-            <li>Reminder bertingkat otomatis, hanya ke tim Legal</li>
-            <li>Tanya LDMS: jawaban AI dengan ID dokumen sumbernya</li>
-          </ul>
-        </div>
-        <p className="text-[13px] text-white/60">Tim Legal · Boga Group</p>
-        <div className="pointer-events-none absolute -right-24 -bottom-24 h-80 w-80 rounded-full bg-white/5" />
-      </div>
-      <div className="flex items-center justify-center px-5 py-12">
-        <div className="w-full max-w-sm">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="" className="mb-6 h-10 w-10 lg:hidden" />
-          <p className="text-[12.5px] font-bold tracking-[0.08em] text-brand uppercase">Boga Group · Tim Legal</p>
-          <h1 className="mt-2 text-[26px] leading-tight font-extrabold tracking-tight text-balance">Welcome to Legal Document Management System</h1>
-          <p className="mt-3 text-[14.5px] leading-relaxed text-ink-2">
-            Registry perizinan outlet, Central Kitchen, dan korporat; perjanjian MLA, ULA, PKS, PSM; pencatatan sanksi berbasis Matrix Disiplin; dan pengetahuan legal tim — khusus tim Legal Boga Group.
-          </p>
-          <div className="mt-7 mb-5 border-t border-line pt-6">
-            <h2 className="text-[17px] font-bold">Masuk</h2>
-            <p className="mt-0.5 text-[14px] text-ink-2">Gunakan NIK karyawan Anda.</p>
+    <div className="flex min-h-screen items-center justify-center bg-bg px-5 py-10">
+      <div className="w-full max-w-[440px]">
+        <div className="flex items-center justify-center gap-[13px]">
+          <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-[11px] bg-brand text-[17px] font-extrabold tracking-[-0.6px] text-white" aria-hidden="true">BG</span>
+          <div>
+            <h1 className="text-[20px] leading-tight font-extrabold tracking-[-0.4px]">Legal Document Management System</h1>
+            <p className="mt-0.5 text-[13px] font-medium text-ink-3">Boga Group · Permit, Agreement, Punishment &amp; Yurisprudensi</p>
           </div>
-          {settings.maintenance && <p className="mb-4 rounded-lg bg-warn-bg px-3 py-2 text-[13.5px] text-warn">{settings.maintenanceMessage}</p>}
-          {settings.uatMode && <p className="mb-4 rounded-lg bg-info-bg px-3 py-2 text-[13.5px] text-info">Mode UAT aktif: ini lingkungan uji coba.</p>}
-          <LoginForm next={next} />
-          <p className="mt-6 text-[13px] text-ink-3">Lupa password atau akun terkunci? Hubungi Manager Legal untuk reset ke tanggal lahir.</p>
         </div>
+        <div className="mt-[26px] rounded-[14px] border border-line bg-surface p-6">
+          <h2 className="text-[13px] font-extrabold tracking-[-0.2px]">Masuk</h2>
+          <p className="mt-1 mb-5 text-[12px] leading-relaxed text-ink-3">Gunakan NIK karyawan Anda. Setiap input, perubahan status, catatan, dan approval tercatat atas nama akun yang dipakai — terlihat di audit trail.</p>
+          {settings.maintenance && <p className="mb-4 rounded-lg bg-warn-bg px-3 py-2 text-[13px] text-warn">{settings.maintenanceMessage}</p>}
+          {settings.uatMode && <p className="mb-4 rounded-lg bg-info-bg px-3 py-2 text-[13px] text-info">Mode UAT aktif: ini lingkungan uji coba.</p>}
+          <LoginForm next={next} />
+        </div>
+        <p className="mt-4 text-center text-[11.5px] leading-relaxed text-ink-3">Khusus tim Legal Boga Group. Lupa password atau akun terkunci? Hubungi Manager Legal untuk reset ke tanggal lahir.</p>
       </div>
     </div>
   );

@@ -1,23 +1,19 @@
 import Link from "next/link";
 import { CheckCircle2, Circle, FlaskConical, KeyRound, RefreshCw, Wrench } from "lucide-react";
-import { getKV, getSettings, query } from "@/lib/db";
+import { getSettings, query } from "@/lib/db";
 import { currentMember, listMembers } from "@/lib/repo";
-import { graphConfigured, mailbox } from "@/lib/graph";
-import { appUrl, emailChannel, waChannel } from "@/lib/notify";
-import { aiEnabled } from "@/lib/ai";
-import { DEFAULT_WORKFLOWS, ROLE_LABEL, type Role } from "@/lib/workflow";
-import { money } from "@/lib/format";
+import { emailChannel, waChannel } from "@/lib/notify";
+import { ROLE_LABEL, type Role } from "@/lib/workflow";
 import { formatDateTime, timeAgo } from "@/lib/time";
-import { Avatar, Card, cx, Notice, PageHeader } from "@/components/ui";
+import { Avatar, Card, cx, Notice } from "@/components/ui";
 import { ActionButton, ActionDialog, ActionForm, Submit } from "@/components/actions";
-import { WorkflowEditor } from "@/components/WorkflowEditor";
 import * as A from "@/app/actions";
 import { employeeSheetId, employeeSyncConfigured, lastSync, planSync } from "@/lib/employees";
 import { googleAccountEmail } from "@/lib/google";
 
 export const dynamic = "force-dynamic";
 
-type Tab = "tim" | "alur" | "aturan" | "sistem";
+type Tab = "tim" | "sistem";
 
 function Conn({ ok, title, children }: { ok: boolean; title: string; children: React.ReactNode }) {
   return (
@@ -47,31 +43,24 @@ function Toggle({ name, defaultChecked, disabled, title, desc, icon: Icon, tone 
 
 export default async function Settings({ searchParams }: { searchParams: Promise<{ tab?: Tab; preview?: string }> }) {
   const sp = await searchParams;
-  const tab: Tab = sp.tab ?? "tim";
-  const [me, settings, members, sub, lastDaily, demo, usageRows] = await Promise.all([
+  const tab: Tab = sp.tab === "sistem" ? "sistem" : "tim";
+  const [me, settings, members, demo] = await Promise.all([
     currentMember(),
     getSettings(),
     listMembers(),
-    getKV<{ id: string; expiration: string }>("graph_subscription"),
-    getKV<{ at: string; breaches: number; escalations: number }>("last_daily"),
-    query<{ n: number }>(`select ((select count(*) from documents where is_demo) + (select count(*) from permits where is_demo))::int as n`),
-    query<{ doc_type: string; stage: string; n: number }>(`select doc_type, stage, count(*)::int as n from documents where status in ('active','on_hold') group by 1, 2`),
+    query<{ n: number }>(`select count(*)::int as n from permits where is_demo`),
   ]);
   const lead = Boolean(me && ["manager", "agm", "admin"].includes(me.role));
   const roles = Object.keys(ROLE_LABEL) as Role[];
-  const usage: Record<string, Record<string, number>> = {};
-  for (const r of usageRows) (usage[r.doc_type] ??= {})[r.stage] = r.n;
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "tim", label: "Tim & akses" },
-    { key: "alur", label: "Alur persetujuan" },
-    { key: "aturan", label: "Aturan" },
     { key: "sistem", label: "Sistem" },
   ];
 
   return (
     <div className="mx-auto max-w-[1080px]">
-      <PageHeader title="Pengaturan" sub={lead ? "Perubahan langsung berlaku untuk seluruh tim." : "Hanya Manager, AGM, atau Admin yang bisa mengubah pengaturan."} />
+      {!lead && <div className="mb-4"><Notice tone="info">Hanya Manager, AGM, atau Admin yang bisa mengubah pengaturan.</Notice></div>}
 
       <nav className="mb-6 flex gap-1 overflow-x-auto border-b border-line">
         {tabs.map((t) => (
@@ -109,7 +98,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
                       <div><label className="label">WhatsApp</label><input name="whatsapp" defaultValue={m.whatsapp ?? ""} className="input h-9" placeholder="0812…" disabled={!lead} /></div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <label className="flex items-center gap-1.5 text-[13px] text-ink-2"><input type="checkbox" name="active" defaultChecked={m.active} disabled={!lead} className="accent-[#c0272d]" /> Aktif</label>
+                      <label className="flex items-center gap-1.5 text-[13px] text-ink-2"><input type="checkbox" name="active" defaultChecked={m.active} disabled={!lead} className="accent-[#c41e29]" /> Aktif</label>
                       {lead && <Submit className="btn btn-sm">Simpan</Submit>}
                     </div>
                   </ActionForm>
@@ -152,40 +141,6 @@ export default async function Settings({ searchParams }: { searchParams: Promise
         </div>
       )}
 
-      {tab === "alur" && (
-        <Card title="Alur persetujuan per jenis dokumen" sub="Atur urutan langkah, siapa yang mengerjakan atau menyetujui, dan target waktunya. Berlaku untuk dokumen baru dan yang sedang berjalan.">
-          <WorkflowEditor initial={settings.workflows} defaults={DEFAULT_WORKFLOWS} usage={usage} threshold={money(settings.cpoThreshold)} action={A.saveWorkflowsAction} readOnly={!lead} />
-        </Card>
-      )}
-
-      {tab === "aturan" && (
-        <Card title="Aturan">
-          <ActionForm action={A.saveSettingsAction} className="grid max-w-2xl gap-4" success="Aturan disimpan">
-            <div>
-              <label className="label" htmlFor="s-kw">Kata kunci di subjek email</label>
-              <textarea id="s-kw" name="subjectKeywords" rows={2} defaultValue={settings.subjectKeywords.join("\n")} className="input" disabled={!lead} />
-              <p className="hint">Email dengan kata ini di subjek otomatis menjadi dokumen. Satu per baris.</p>
-            </div>
-            <div>
-              <label className="label" htmlFor="s-cpo">Batas &ldquo;nilai besar&rdquo; (Rp)</label>
-              <input id="s-cpo" name="cpoThreshold" defaultValue={settings.cpoThreshold.toLocaleString("id-ID")} className="input tnum" disabled={!lead} />
-              <p className="hint">Dipakai langkah alur yang diatur &ldquo;Jika nilai besar / risiko tinggi&rdquo;, misalnya persetujuan CPLO.</p>
-            </div>
-            <div>
-              <label className="label" htmlFor="s-esc">Lapor ke atasan jika terlambat lebih dari (hari kerja)</label>
-              <input id="s-esc" name="escalateAfterDays" type="number" min={0} step={0.5} defaultValue={settings.escalateAfterDays} className="input" disabled={!lead} />
-            </div>
-            <div>
-              <label className="label" htmlFor="s-hol">Hari libur (tidak dihitung)</label>
-              <textarea id="s-hol" name="holidays" rows={3} defaultValue={settings.holidays.join("\n")} className="input tnum" disabled={!lead} />
-              <p className="hint">Format TTTT-BB-HH, satu per baris.</p>
-            </div>
-            <label className="flex items-center gap-2.5 text-[14px] font-semibold"><input type="checkbox" name="digestEnabled" defaultChecked={settings.digestEnabled} disabled={!lead} className="h-4 w-4 accent-[#c0272d]" /> Kirim daftar tugas tiap pagi kerja (08.00 WIB)</label>
-            {lead && <div><Submit>Simpan aturan</Submit></div>}
-          </ActionForm>
-        </Card>
-      )}
-
       {tab === "sistem" && (
         <div className="space-y-5">
           <Card title="Mode sistem">
@@ -199,7 +154,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
               </div>
               <Toggle name="maintenance" defaultChecked={settings.maintenance} disabled={!lead} icon={Wrench} tone="border-line text-warn"
                 title="Mode maintenance"
-                desc="Hanya Manager Legal, AGM, dan Admin yang bisa masuk. Anggota lain melihat pesan di bawah. Email yang masuk tetap tercatat." />
+                desc="Hanya Manager Legal, AGM, dan Admin yang bisa masuk. Anggota lain melihat pesan di bawah. " />
               <div className="pl-1 sm:pl-8">
                 <label className="label" htmlFor="mt-msg">Pesan untuk pengguna</label>
                 <input id="mt-msg" name="maintenanceMessage" defaultValue={settings.maintenanceMessage} className="input max-w-xl" disabled={!lead} />
@@ -208,7 +163,7 @@ export default async function Settings({ searchParams }: { searchParams: Promise
             </ActionForm>
             {lead && demo[0]?.n > 0 && (
               <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-line-2 pt-4 text-[14px]">
-                <span className="flex-1 text-ink-2">Ada <b className="text-ink">{demo[0].n} dokumen</b> contoh/uji (kontrak dan registry perizinan contoh, atau dibuat saat UAT).</span>
+                <span className="flex-1 text-ink-2">Ada <b className="text-ink">{demo[0].n} dokumen</b> contoh/uji di registry perizinan.</span>
                 <ActionButton action={A.deleteDemoAction} id={0} className="btn btn-sm btn-danger" success="Data uji dihapus" pending="Menghapus…">Hapus data uji</ActionButton>
               </div>
             )}
@@ -216,25 +171,10 @@ export default async function Settings({ searchParams }: { searchParams: Promise
 
           <Card title="Koneksi">
             <ul className="-my-3 divide-y divide-line-2">
-              <Conn ok={graphConfigured()} title="Outlook (mailbox legal)">
-                {graphConfigured() ? <>Membaca {mailbox()}.{sub && ` Pemantauan aktif s.d. ${formatDateTime(sub.expiration)}.`}</> : <>Perlu izin dari IT (App Registration Microsoft). Sementara itu, gunakan Upload email.</>}
-              </Conn>
-              <Conn ok={aiEnabled()} title="Pembaca dokumen otomatis (AI)">Mengisi pihak lawan, nilai, deadline, dan poin penting dari email & PDF.</Conn>
-              <Conn ok={Boolean(emailChannel())} title="Notifikasi email">{emailChannel() ? "Terkirim otomatis saat dokumen pindah langkah atau terlambat." : "Aktif setelah Outlook tersambung."}</Conn>
+              <Conn ok={Boolean(emailChannel())} title="Notifikasi email">{emailChannel() ? "Siap dipakai untuk reminder perizinan ke tim Legal." : "Aktif setelah mailbox Legal (Microsoft 365) tersambung."}</Conn>
               <Conn ok={Boolean(waChannel())} title="Notifikasi WhatsApp">{waChannel() ? "Terkirim ke nomor yang diisi di daftar tim." : "Perlu token Fonnte atau WhatsApp Business API."}</Conn>
-              <Conn ok={Boolean(lastDaily)} title="Pengecekan harian">{lastDaily ? `Terakhir ${formatDateTime(lastDaily.at)}: ${lastDaily.breaches} terlambat, ${lastDaily.escalations} dilaporkan ke atasan.` : "Berjalan otomatis tiap pagi."}</Conn>
+              <Conn ok={employeeSyncConfigured()} title="Sinkron data karyawan">{employeeSyncConfigured() ? "Akun tim Legal diperbarui otomatis tiap pagi dari sheet karyawan." : "Belum tersambung ke sheet karyawan."}</Conn>
             </ul>
-            {lead && (
-              <div className="mt-4 flex flex-wrap gap-2 border-t border-line-2 pt-4">
-                {graphConfigured() && <ActionButton action={A.syncNowAction} id={0} className="btn btn-sm" success="Sinkron selesai" pending="Menyinkron…">Ambil email 14 hari terakhir</ActionButton>}
-                <ActionButton action={A.runDailyAction} id={0} className="btn btn-sm" success="Pengecekan selesai" pending="Mengecek…">Cek keterlambatan sekarang</ActionButton>
-              </div>
-            )}
-            <details className="mt-4 text-[13px] text-ink-2">
-              <summary className="cursor-pointer font-semibold text-ink">Info teknis untuk IT</summary>
-              <p className="mt-2">Webhook Outlook: <code>{appUrl()}/api/graph/webhook</code></p>
-              <p className="mt-1">Endpoint Power Automate: <code>POST {appUrl()}/api/ingest</code> (header Authorization: Bearer INGEST_TOKEN)</p>
-            </details>
           </Card>
         </div>
       )}

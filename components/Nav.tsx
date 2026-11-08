@@ -1,90 +1,125 @@
 "use client";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, FileSignature, Gavel, Home, Inbox, Landmark, Settings, ShieldCheck, Sparkles, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, Menu, Settings, ShieldCheck, X } from "lucide-react";
+import { isActive, NAV, NAV_ITEMS, navFor } from "@/lib/nav";
 import { cx } from "./ui";
 
-interface Item { href: string; label: string; short?: string; icon: LucideIcon; soon?: boolean }
-
-/** Menu grouped by the four LDMS pillars (blueprint §3), trimmed to the screens people actually use. */
-const GROUPS: { label: string; items: Item[] }[] = [
-  { label: "Ringkasan", items: [
-    { href: "/", label: "Beranda", icon: Home },
-    { href: "/tanya", label: "Tanya LDMS", short: "Tanya", icon: Sparkles, soon: true },
-  ] },
-  { label: "Permit", items: [
-    { href: "/perizinan", label: "Perizinan", short: "Izin", icon: ShieldCheck },
-    { href: "/perjanjian", label: "Perjanjian", short: "Perjanjian", icon: FileSignature, soon: true },
-  ] },
-  { label: "Punishment", items: [
-    { href: "/sanksi", label: "Sanksi & Matrix", icon: Gavel, soon: true },
-  ] },
-  { label: "History & Library", items: [
-    { href: "/pemeriksaan", label: "Pemeriksaan", icon: Landmark, soon: true },
-    { href: "/pustaka", label: "Pustaka & KB", icon: BookOpen, soon: true },
-    { href: "/kontrak", label: "Review Kontrak", short: "Kontrak", icon: Inbox },
-  ] },
-  { label: "Lainnya", items: [
-    { href: "/settings", label: "Pengaturan", icon: Settings },
-  ] },
-];
-
-const ALL = GROUPS.flatMap((g) => g.items);
-const KONTRAK_PATHS = ["/kontrak", "/documents", "/intake"];
-
-function isActive(path: string, href: string) {
-  if (href === "/") return path === "/";
-  if (href === "/kontrak") return KONTRAK_PATHS.some((p) => path === p || path.startsWith(p + "/"));
-  return path === href || path.startsWith(href + "/");
-}
-
-export function SideNav({ badges = {} }: { badges?: Record<string, number> }) {
+export function SideNav({ badges = {}, preview = false, onNavigate }: { badges?: Record<string, { n: number; hot?: boolean }>; preview?: boolean; onNavigate?: () => void }) {
   const path = usePathname();
+  let n = 0;
   return (
-    <nav className="-mx-1 flex flex-col gap-4 overflow-y-auto px-1">
-      {GROUPS.map((g) => (
-        <div key={g.label}>
-          <p className="mb-1 px-3 text-[11px] font-bold tracking-wider text-ink-3 uppercase">{g.label}</p>
-          <div className="flex flex-col gap-0.5">
-            {g.items.map(({ href, label, icon: Icon, soon }) => {
-              const on = isActive(path, href);
-              const n = badges[href];
-              return (
-                <Link key={href} href={href}
-                  className={cx("flex items-center gap-3 rounded-lg px-3 py-[7px] text-[14px] font-semibold transition-colors",
-                    on ? "bg-brand-subtle text-brand" : soon ? "text-ink-3 hover:bg-mute-bg hover:text-ink-2" : "text-ink-2 hover:bg-mute-bg hover:text-ink")}>
-                  <Icon size={18} strokeWidth={2} className="shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">{label}</span>
-                  {n ? <span className={cx("rounded-full px-1.5 text-[11.5px] font-bold tnum", on ? "bg-brand text-white" : "bg-brand-subtle text-brand")}>{n}</span> : null}
-                  {soon && !on && <span className="text-[10.5px] font-semibold text-ink-3">Segera</span>}
-                </Link>
-              );
-            })}
-          </div>
+    <nav aria-label="Menu utama" className="flex flex-col gap-0.5">
+      {NAV.map((g) => (
+        <div key={g.label} className="mb-1.5">
+          <p className="mt-2 mb-1.5 px-2 text-[10.5px] font-bold tracking-[0.9px] text-ink-3 uppercase">{g.label}</p>
+          {g.items.map((it) => {
+            const num = it.href === "/settings" ? "··" : String(++n).padStart(2, "0");
+            const on = isActive(path, it.href);
+            const soon = Boolean(it.preview) && !preview;
+            const b = badges[it.href];
+            return (
+              <Link key={it.href} href={it.href} onClick={onNavigate} aria-current={on ? "page" : undefined}
+                className={cx("flex items-center gap-2.5 rounded-lg border px-2.5 py-[6px] text-[13px] transition-colors",
+                  on ? "border-brand-line bg-brand-subtle font-bold text-brand-hover" : "border-transparent font-medium hover:bg-mute-bg",
+                  !on && (soon ? "text-ink-3" : "text-[#3a4048]"))}>
+                <span className={cx("w-[18px] shrink-0 font-mono text-[11px]", on ? "text-brand" : "text-ink-3")}>{num}</span>
+                <span className="min-w-0 flex-1 leading-snug">{it.label}</span>
+                {b && b.n > 0 ? (
+                  <span className={cx("rounded-[5px] px-1.5 py-px font-mono text-[10.5px] font-semibold", b.hot ? "bg-brand-soft text-brand" : "bg-mute-bg text-ink-2")}>{b.n}</span>
+                ) : soon ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-line" title="Segera hadir"><span className="sr-only">segera hadir</span></span> : null}
+              </Link>
+            );
+          })}
         </div>
       ))}
     </nav>
   );
 }
 
-export function BottomNav({ badges = {} }: { badges?: Record<string, number> }) {
+/** Page title strip at the top of every screen (design: title + sub on the left, date and user on the right). */
+export function TopBar({ name, title, initials }: { name: string; title: string; initials: string }) {
   const path = usePathname();
-  if (/^\/documents\/\d+/.test(path)) return null; // the document page shows its own action bar
-  const tabs = ["/", "/perizinan", "/kontrak", "/settings"].map((h) => ALL.find((i) => i.href === h)!);
+  const it = navFor(path);
+  const today = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date());
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-      {tabs.map(({ href, label, short, icon: Icon }) => {
-        const on = isActive(path, href);
-        const n = badges[href];
-        return (
-          <Link key={href} href={href} className={cx("relative flex flex-col items-center gap-0.5 py-2 text-[11.5px] font-semibold", on ? "text-brand" : "text-ink-3")}>
-            <Icon size={21} strokeWidth={on ? 2.4 : 2} />
-            {short ?? label}
-            {n ? <span className="absolute top-1 left-1/2 ml-2 rounded-full bg-brand px-1 text-[10px] leading-4 font-bold text-white tnum">{n}</span> : null}
-          </Link>
-        );
-      })}
-    </nav>
+    <header className="hidden items-center justify-between gap-6 border-b border-line bg-surface px-7 py-[18px] md:flex">
+      <div className="min-w-0">
+        <h1 className="text-[19px] font-extrabold tracking-[-0.35px]">{it?.title ?? "Legal DMS"}</h1>
+        {it?.sub && <p className="mt-[3px] text-[12.5px] font-medium text-ink-3">{it.sub}</p>}
+      </div>
+      <div className="flex shrink-0 items-center gap-4">
+        <div className="text-right">
+          <div className="text-[11px] font-medium text-ink-3">Hari ini</div>
+          <div className="font-mono text-[13px] font-semibold">{today}</div>
+        </div>
+        <span className="h-8 w-px bg-line" aria-hidden="true" />
+        <div className="flex items-center gap-2.5">
+          <span className="grid h-8 w-8 place-items-center rounded-full bg-ink text-[12px] font-bold text-white" aria-hidden="true">{initials}</span>
+          <div className="leading-tight">
+            <div className="text-[13px] font-bold">{name}</div>
+            <div className="text-[11.5px] text-ink-3">{title}</div>
+          </div>
+        </div>
+      </div>
+    </header>
   );
 }
 
+/** Phone: title bar with a menu sheet, plus a bottom bar for the screens people use most. */
+export function MobileNav({ badges = {}, preview = false, footer }: { badges?: Record<string, { n: number; hot?: boolean }>; preview?: boolean; footer: React.ReactNode }) {
+  const path = usePathname();
+  const [open, setOpen] = useState(false);
+  useEffect(() => setOpen(false), [path]);
+  const it = navFor(path);
+  const tabs = [
+    { href: "/", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/perizinan", label: "Registry", icon: ShieldCheck },
+    { href: "/settings", label: "Pengaturan", icon: Settings },
+  ];
+  return (
+    <>
+      <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-surface/95 px-4 py-3 backdrop-blur md:hidden">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-brand text-[13px] font-extrabold tracking-[-0.5px] text-white" aria-hidden="true">BG</span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[15px] font-extrabold tracking-[-0.3px]">{it?.title ?? "Legal DMS"}</div>
+          <div className="truncate text-[11.5px] text-ink-3">Legal DMS · Boga Group</div>
+        </div>
+        <button type="button" className="btn btn-ghost btn-sm px-2" aria-label="Buka menu" aria-expanded={open} onClick={() => setOpen(true)}><Menu size={20} /></button>
+      </header>
+
+      {open && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <button type="button" aria-label="Tutup menu" className="absolute inset-0 bg-ink/35" onClick={() => setOpen(false)} />
+          <div className="absolute inset-y-0 right-0 flex w-[min(320px,88vw)] flex-col overflow-y-auto bg-surface px-3 py-4 shadow-drawer">
+            <div className="mb-2 flex items-center justify-between px-2">
+              <span className="text-[14px] font-extrabold">Menu</span>
+              <button type="button" className="btn btn-ghost btn-sm px-2" aria-label="Tutup menu" onClick={() => setOpen(false)}><X size={18} /></button>
+            </div>
+            <SideNav badges={badges} preview={preview} onNavigate={() => setOpen(false)} />
+            <div className="mt-auto pt-3">{footer}</div>
+          </div>
+        </div>
+      )}
+
+      <nav aria-label="Navigasi bawah" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+        {tabs.map(({ href, label, icon: Icon }) => {
+          const on = isActive(path, href);
+          const n = badges[href]?.hot ? badges[href]?.n : 0;
+          return (
+            <Link key={href} href={href} className={cx("relative flex flex-col items-center gap-0.5 py-2 text-[11.5px] font-semibold", on ? "text-brand" : "text-ink-3")}>
+              <Icon size={21} strokeWidth={on ? 2.4 : 2} />
+              {label}
+              {n ? <span className="absolute top-1 left-1/2 ml-2 rounded-full bg-brand px-1 font-mono text-[10px] leading-4 font-bold text-white">{n}</span> : null}
+            </Link>
+          );
+        })}
+        <button type="button" onClick={() => setOpen(true)} className={cx("flex flex-col items-center gap-0.5 py-2 text-[11.5px] font-semibold", !tabs.some((t) => isActive(path, t.href)) && NAV_ITEMS.some((i) => isActive(path, i.href)) ? "text-brand" : "text-ink-3")}>
+          <Menu size={21} />
+          Lainnya
+        </button>
+      </nav>
+    </>
+  );
+}

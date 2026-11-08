@@ -1,152 +1,160 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, CalendarClock, Inbox, ShieldAlert, ShieldCheck } from "lucide-react";
-import { query } from "@/lib/db";
-import { currentMember } from "@/lib/repo";
 import { daysText, inWindow, listPermits, needsAck, RENEWAL_LABEL, shortName, TIME_CHIP, timeStatus, type PermitRow } from "@/lib/ldms/permits";
-import { money } from "@/lib/format";
-import { formatDate, formatDateTime } from "@/lib/time";
-import { Card, cx, Empty } from "@/components/ui";
+import { formatDate } from "@/lib/time";
+import { cx } from "@/components/ui";
+import { GlobalSearch, type SearchRow } from "@/components/dashboard/GlobalSearch";
 
 export const dynamic = "force-dynamic";
 
 const urgency = (p: PermitRow) => (needsAck(p) ? -1000 : 0) + (p.days ?? 1e6);
+const isOverdue = (p: PermitRow) => p.days !== null && p.days < 0;
+const due30 = (p: PermitRow) => p.days !== null && p.days >= 0 && p.days <= 30;
 
-export default async function Beranda() {
-  const me = (await currentMember())!;
-  const [permits, contracts, recent] = await Promise.all([
-    listPermits(),
-    query<{ mine: number; open: number }>(
-      `select count(*) filter (where assignee_id = $1)::int as mine, count(*)::int as open from documents where status in ('active','on_hold')`, [me.id]),
-    query<{ id: number; at: string; actor: string | null; action: string; entity: string; entity_id: string; detail: string | null; code: string | null }>(
-      `select a.id, a.at, a.actor, a.action, a.entity, a.entity_id, a.detail, p.code from audit_log a
-       left join permits p on a.entity = 'permit' and p.id::text = a.entity_id order by a.at desc limit 8`),
-  ]);
+export default async function Dashboard() {
+  const permits = await listPermits();
 
-  const overdue = permits.filter((p) => p.days !== null && p.days < 0);
-  const due30 = permits.filter((p) => p.days !== null && p.days >= 0 && p.days <= 30);
-  const somasi = permits.filter(needsAck);
-  const compliance = permits.length ? Math.round(((permits.length - overdue.length) / permits.length) * 1000) / 10 : 100;
-  const cost30 = due30.reduce((s, p) => s + Number(p.est_cost ?? 0), 0);
+  const overdue = permits.filter(isOverdue);
+  const soon = permits.filter(due30);
+  const ackNeeded = permits.filter((p) => p.requires_ack);
+  const acked = ackNeeded.filter((p) => p.ack_at);
+  const compliance = permits.length ? Math.round(((permits.length - overdue.length) / permits.length) * 100) : 100;
 
-  const mine = permits.filter((p) => p.pic_id === me.id && (inWindow(p) || needsAck(p))).sort((a, b) => urgency(a) - urgency(b));
-  const team = me.role === "staff" ? [] : permits.filter((p) => p.pic_id !== me.id && ((p.days ?? 1) < 0 || needsAck(p))).sort((a, b) => urgency(a) - urgency(b));
+  const buckets = [
+    { label: "Overdue", t: "overdue", n: overdue.length, fg: "text-brand", bar: "#C41E29" },
+    { label: "≤7 hari", t: "d30", n: permits.filter((p) => p.days !== null && p.days >= 0 && p.days <= 7).length, fg: "text-brand-hover", bar: "#E2606A" },
+    { label: "8-30 hari", t: "d30", n: permits.filter((p) => p.days !== null && p.days > 7 && p.days <= 30).length, fg: "text-[#8a5a0b]", bar: "#E9A93C" },
+    { label: "31-60 hari", t: "", n: permits.filter((p) => p.days !== null && p.days > 30 && p.days <= 60).length, fg: "text-[#6b5c10]", bar: "#D9CE72" },
+    { label: "Aman (>60 hari)", t: "", n: permits.filter((p) => p.days === null || p.days > 60).length, fg: "text-[#3f5a4d]", bar: "#BFCCC4" },
+  ];
+  const maxB = Math.max(1, ...buckets.map((b) => b.n));
 
-  const brands = new Map<string, { total: number; ok: number }>();
+  const brands = new Map<string, { total: number; over: number; soon: number }>();
   for (const p of permits) {
     const k = p.brand ?? (p.scope === "central_kitchen" ? "Central Kitchen" : "Korporat");
-    const b = brands.get(k) ?? { total: 0, ok: 0 };
+    const b = brands.get(k) ?? { total: 0, over: 0, soon: 0 };
     b.total++;
-    if (!(p.days !== null && p.days < 0)) b.ok++;
+    if (isOverdue(p)) b.over++;
+    if (due30(p)) b.soon++;
     brands.set(k, b);
   }
-  const brandRows = [...brands.entries()].map(([name, b]) => ({ name, ...b, pct: Math.round((b.ok / b.total) * 100) })).sort((a, b) => a.pct - b.pct || a.name.localeCompare(b.name));
+  const brandRows = [...brands.entries()]
+    .map(([name, b]) => ({ name, ...b, pct: Math.round(((b.total - b.over) / b.total) * 100) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
-  const hour = Number(new Date(Date.now() + 7 * 3600_000).toISOString().slice(11, 13));
-  const greet = hour < 11 ? "Selamat pagi" : hour < 15 ? "Selamat siang" : hour < 18 ? "Selamat sore" : "Selamat malam";
+  const action = permits.filter((p) => inWindow(p) || needsAck(p)).sort((a, b) => urgency(a) - urgency(b));
+
+  const search: SearchRow[] = permits.map((p) => ({
+    code: p.code, type: p.type_name, unit: p.unit_name, number: p.number, pic: shortName(p.pic_name), brand: p.brand, city: p.city,
+    days: p.days, renewal: RENEWAL_LABEL[p.renewal_status], inWindow: inWindow(p), somasi: needsAck(p), belum: inWindow(p) && p.renewal_status === "belum",
+  }));
 
   return (
-    <div className="mx-auto max-w-[1180px] space-y-6">
-      <div>
-        <p className="text-[13.5px] font-semibold text-ink-3">{formatDate(Date.now())}</p>
-        <h1 className="mt-0.5 text-[26px] font-bold tracking-tight">{greet}, {shortName(me.name)}</h1>
-        <p className="mt-1 text-ink-2">
-          {mine.length ? <>Ada <b className="text-ink">{mine.length} izin</b> yang perlu Anda tangani.</> : "Tidak ada izin Anda yang perlu ditangani hari ini."}
-          {contracts[0]?.mine ? <> · <Link href="/kontrak?f=mine" className="font-semibold text-brand">{contracts[0].mine} kontrak</Link> di meja Anda.</> : null}
-        </p>
-      </div>
+    <div className="space-y-5">
+      <GlobalSearch rows={search} />
 
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Kpi href="/perizinan" label="Izin aktif" value={permits.length} icon={ShieldCheck} />
-        <Kpi href="/perizinan?t=overdue&pic=all" label="Overdue" value={overdue.length} icon={AlertTriangle} tone={overdue.length ? "bad" : undefined} />
-        <Kpi href="/perizinan?t=d30&pic=all" label="Jatuh tempo ≤ 30 hari" value={due30.length} sub={cost30 ? `est. ${money(cost30)}` : undefined} icon={CalendarClock} tone={due30.length ? "warn" : undefined} />
-        <Kpi href="/perizinan?t=somasi&pic=all" label="Somasi belum ack" value={somasi.length} icon={ShieldAlert} tone={somasi.length ? "bad" : undefined} />
-        <Kpi href="/perizinan?pic=all" label="Compliance" value={`${compliance.toLocaleString("id-ID")}%`} sub="izin tidak kedaluwarsa" icon={ShieldCheck} tone={compliance < 95 ? "warn" : "ok"} />
+      <section className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4" aria-label="Ringkasan">
+        <Kpi dot="bg-brand" label="Sudah kedaluwarsa" value={overdue.length} unit="dokumen" tone="text-brand" href="/perizinan?t=overdue&pic=all">Segera proses renewal; eskalasi ke Legal Manager & Head of Legal</Kpi>
+        <Kpi dot="bg-[#e9a93c]" label="Jatuh tempo ≤30 hari" value={soon.length} unit="dokumen" href="/perizinan?t=d30&pic=all">Ambang renewal berbeda per jenis izin</Kpi>
+        <Kpi dot="bg-ok" label="Compliance score" value={compliance} unit="%" href="/perizinan?pic=all">Dokumen berlaku dibagi total registry</Kpi>
+        <Kpi dot="bg-ink" label="Acknowledge Legal" value={`${acked.length}/${ackNeeded.length}`} unit="dokumen" href="/perizinan?t=somasi&pic=all">Somasi: siapa terima, kapan, via apa</Kpi>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-        <div className="space-y-6">
-          <Card title="Perlu tindakan Anda" sub="Izin yang sudah masuk masa renewal atau bersomasi, paling mendesak di atas." pad={false}
-            action={<Link href="/perizinan?t=aksi&pic=me" className="btn btn-ghost btn-sm">Lihat semua <ArrowRight size={14} /></Link>}>
-            {mine.length === 0 ? <Empty title="Semua aman">Tidak ada izin Anda di masa renewal.</Empty> : <PermitList rows={mine.slice(0, 8)} />}
-          </Card>
-          {team.length > 0 && (
-            <Card title="Perlu perhatian tim" sub="Overdue atau somasi belum acknowledge milik PIC lain." pad={false}
-              action={<Link href="/perizinan?t=overdue&pic=all" className="btn btn-ghost btn-sm">Registry <ArrowRight size={14} /></Link>}>
-              <PermitList rows={team.slice(0, 6)} showPic />
-            </Card>
-          )}
-        </div>
+      <div className="grid gap-5 lg:grid-cols-2">
+        <section className="card p-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-[15px] font-extrabold tracking-[-0.2px]">Pipeline Kedaluwarsa</h2>
+            <span className="text-[12px] text-ink-3">ambang renewal mengikuti master list per jenis izin</span>
+          </div>
+          <ul className="mt-4 space-y-3">
+            {buckets.map((b) => (
+              <li key={b.label}>
+                <Link href={b.t ? `/perizinan?t=${b.t}&pic=all` : "/perizinan?pic=all"} className="grid grid-cols-[92px_1fr_40px] items-center gap-3 hover:no-underline">
+                  <span className={cx("font-mono text-[12px] font-semibold leading-tight", b.fg)}>{b.label}</span>
+                  <span className="h-[26px] overflow-hidden rounded-md bg-mute-bg"><span className="block h-full rounded-md" style={{ width: `${Math.max(4, Math.round((b.n / maxB) * 100))}%`, background: b.bar }} /></span>
+                  <span className="text-right font-mono text-[14px] font-semibold text-ink">{b.n}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-5 rounded-[10px] border border-brand-line bg-brand-subtle px-4 py-3 text-[12.5px] leading-relaxed text-brand-deep">
+            <b>Eskalasi internal Legal.</b> Ambang pertama mengikuti jenis izin dan hanya ke Legal Officer pemegang dokumen. Berikutnya CC Legal Manager, lalu Head of Legal. Overdue dikirim harian sampai izin terbit. Notifikasi tidak dikirim ke PIC outlet.
+          </p>
+        </section>
 
-        <div className="space-y-6">
-          <Card title="Compliance per brand" sub="% izin yang belum kedaluwarsa">
-            <ul className="space-y-3">
-              {brandRows.map((b) => (
-                <li key={b.name}>
-                  <Link href={`/perizinan?pic=all&brand=${encodeURIComponent(["Central Kitchen", "Korporat"].includes(b.name) ? "—" : b.name)}`} className="group block">
-                    <div className="flex items-baseline justify-between text-[13.5px]">
-                      <span className="font-semibold group-hover:text-brand">{b.name}</span>
-                      <span className={cx("tnum font-semibold", b.pct < 95 ? "text-brand" : "text-ink-2")}>{b.pct}% <span className="font-normal text-ink-3">· {b.total}</span></span>
-                    </div>
-                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-mute-bg"><div className={cx("h-full rounded-full", b.pct < 95 ? "bg-brand" : "bg-ok")} style={{ width: `${b.pct}%` }} /></div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Card>
-
-          <Card title="Review Kontrak" action={<Inbox size={18} className="text-ink-3" />}>
-            <p className="text-[14px] text-ink-2"><b className="text-ink tnum">{contracts[0]?.open ?? 0}</b> kontrak berjalan dari email [LEGAL]{contracts[0]?.mine ? <>, <b className="text-ink">{contracts[0].mine}</b> di meja Anda</> : null}.</p>
-            <Link href="/kontrak" className="btn btn-sm mt-3">Buka Review Kontrak</Link>
-          </Card>
-
-          <Card title="Aktivitas terakhir" pad={false}>
-            {recent.length === 0 ? <Empty title="Belum ada aktivitas" /> : (
-              <ul className="divide-y divide-line-2">
-                {recent.map((a) => (
-                  <li key={a.id} className="px-5 py-2.5 text-[13.5px]">
-                    <b>{shortName(a.actor)}</b> {a.action}{" "}
-                    {a.code ? <Link href={`/perizinan?pic=all&d=${a.code}`} className="font-mono text-[12.5px] font-semibold text-brand">{a.code}</Link> : null}
-                    {a.detail ? <span className="text-ink-2"> — {a.detail.length > 70 ? a.detail.slice(0, 70) + "…" : a.detail}</span> : null}
-                    <div className="text-[12px] text-ink-3">{formatDateTime(a.at)}</div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        </div>
+        <section className="card p-5">
+          <h2 className="text-[15px] font-extrabold tracking-[-0.2px]">Compliance per Brand</h2>
+          <ul className="mt-4 space-y-4">
+            {brandRows.map((b) => (
+              <li key={b.name}>
+                <Link href={`/perizinan?pic=all&brand=${encodeURIComponent(["Central Kitchen", "Korporat"].includes(b.name) ? "—" : b.name)}`} className="group block hover:no-underline">
+                  <div className="flex items-baseline justify-between text-[13px]">
+                    <span className="font-bold text-ink group-hover:text-brand">{b.name}</span>
+                    <span className={cx("font-mono text-[12px] font-semibold", b.pct >= 95 ? "text-ok" : "text-brand")}>{b.pct}%</span>
+                  </div>
+                  <div className="mt-1.5 h-[5px] overflow-hidden rounded-full bg-mute-bg"><div className={cx("h-full rounded-full", b.pct >= 95 ? "bg-ok" : "bg-brand")} style={{ width: `${b.pct}%` }} /></div>
+                  <div className="mt-1 text-[11.5px] text-ink-3">{b.over} overdue · {b.soon} jatuh tempo ≤30h · {b.total} dokumen</div>
+                </Link>
+              </li>
+            ))}
+            {brandRows.length === 0 && <li className="text-[13px] text-ink-3">Registry masih kosong.</li>}
+          </ul>
+        </section>
       </div>
+
+      <section className="card overflow-hidden">
+        <header className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+          <h2 className="text-[15px] font-extrabold tracking-[-0.2px]">Butuh Tindakan Hari Ini</h2>
+          <Link href="/perizinan?t=aksi&pic=all" className="btn btn-sm">Buka registry</Link>
+        </header>
+        {action.length === 0 ? (
+          <p className="border-t border-line-2 px-5 py-8 text-center text-[13.5px] text-ink-2">Tidak ada izin di masa renewal atau somasi yang menunggu.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left text-[13px]">
+              <thead className="border-y border-line bg-[#fafbfc] text-[11px] font-bold tracking-[0.6px] text-ink-3 uppercase">
+                <tr>
+                  <th className="px-5 py-2.5 font-bold">Dokumen</th>
+                  <th className="px-3 py-2.5 font-bold">Outlet</th>
+                  <th className="px-3 py-2.5 font-bold">Expiry</th>
+                  <th className="px-3 py-2.5 font-bold">Sisa</th>
+                  <th className="px-3 py-2.5 font-bold">Renewal</th>
+                  <th className="px-3 py-2.5 font-bold">Ack</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line-2">
+                {action.slice(0, 10).map((p) => (
+                  <tr key={p.id} className="group relative hover:bg-[#fafbfc]">
+                    <td className="px-5 py-3">
+                      <Link href={`/perizinan?pic=all&d=${p.code}`} className="font-bold text-ink after:absolute after:inset-0 group-hover:text-brand hover:no-underline">{p.type_name}</Link>
+                      <div className="font-mono text-[10.5px] text-ink-3">{p.number ?? p.code}</div>
+                    </td>
+                    <td className="px-3 py-3">{p.unit_name}</td>
+                    <td className="px-3 py-3 font-mono text-[12px] whitespace-nowrap">{p.expiry_date ? formatDate(p.expiry_date) : "—"}</td>
+                    <td className="px-3 py-3"><span className={cx("inline-block rounded-md px-2 py-[3px] font-mono text-[11px] font-semibold whitespace-nowrap", TIME_CHIP[timeStatus(p.days)])}>{daysText(p.days)}</span></td>
+                    <td className="px-3 py-3 font-semibold">{RENEWAL_LABEL[p.renewal_status]}</td>
+                    <td className="px-3 py-3 text-[12px]">
+                      {!p.requires_ack ? <span className="text-ink-3">—</span> : p.ack_at ? <span className="font-semibold text-ok">{shortName(p.ack_by)}</span> : <span className="font-semibold text-brand">belum</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
 
-function Kpi({ href, label, value, sub, icon: Icon, tone }: { href: string; label: string; value: React.ReactNode; sub?: string; icon: typeof ShieldCheck; tone?: "bad" | "warn" | "ok" }) {
-  const t = tone === "bad" ? "text-brand" : tone === "warn" ? "text-warn" : tone === "ok" ? "text-ok" : "text-ink";
+function Kpi({ dot, label, value, unit, tone, href, children }: { dot: string; label: string; value: React.ReactNode; unit: string; tone?: string; href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} className="card group p-4 transition-colors hover:border-ink-3">
-      <div className="flex items-center justify-between text-[12.5px] font-semibold text-ink-3">{label}<Icon size={16} /></div>
-      <div className={cx("mt-1.5 text-[26px] leading-none font-bold tnum", t)}>{value}</div>
-      {sub && <div className="mt-1 text-[12px] text-ink-3">{sub}</div>}
+    <Link href={href} className="card block p-5 transition-colors hover:border-ink-3 hover:no-underline">
+      <div className="flex items-center gap-2 text-[11.5px] font-bold tracking-[0.6px] text-ink-2 uppercase"><span className={cx("h-2 w-2 rounded-full", dot)} aria-hidden="true" />{label}</div>
+      <div className="mt-2.5 flex items-baseline gap-1.5">
+        <span className={cx("font-mono text-[30px] leading-none font-semibold tracking-[-1px]", tone ?? "text-ink")}>{value}</span>
+        <span className="text-[12px] font-medium text-ink-3">{unit}</span>
+      </div>
+      <p className="mt-3 text-[12px] leading-relaxed text-ink-3">{children}</p>
     </Link>
-  );
-}
-
-function PermitList({ rows, showPic }: { rows: PermitRow[]; showPic?: boolean }) {
-  return (
-    <ul className="divide-y divide-line-2">
-      {rows.map((p) => (
-        <li key={p.id}>
-          <Link href={`/perizinan?pic=all&d=${p.code}`} className="flex items-center gap-3 px-5 py-3 hover:bg-bg">
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="truncate font-semibold">{p.type_name}</span>
-                {needsAck(p) && <span className="chip h-5 shrink-0 bg-brand px-1.5 text-[11px] text-white">Somasi</span>}
-              </div>
-              <div className="truncate text-[13px] text-ink-2">{p.unit_name} · {RENEWAL_LABEL[p.renewal_status]}{showPic ? ` · ${shortName(p.pic_name)}` : ""}</div>
-            </div>
-            <span className={cx("chip shrink-0 font-mono", TIME_CHIP[timeStatus(p.days)])}>{daysText(p.days)}</span>
-          </Link>
-        </li>
-      ))}
-    </ul>
   );
 }

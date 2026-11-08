@@ -7,7 +7,7 @@ import {
   TIME_CHIP, timeStatus, type PermitRow,
 } from "@/lib/ldms/permits";
 import { formatDate } from "@/lib/time";
-import { Avatar, cx, Empty, Notice, PageHeader } from "@/components/ui";
+import { cx, Empty, Notice } from "@/components/ui";
 import { FilterBar } from "@/components/permits/FilterBar";
 import { PermitDrawer } from "@/components/permits/PermitDrawer";
 import { PermitForm } from "@/components/permits/PermitForm";
@@ -76,88 +76,88 @@ export default async function Perizinan({ searchParams }: { searchParams: Promis
   const picName = pic === "me" ? "saya" : pic === "all" ? null : members.find((m) => String(m.id) === pic)?.name;
 
   return (
-    <div className="mx-auto max-w-[1180px]">
-      <PageHeader title="Registry Perizinan" sub={<>{all.length} dokumen izin outlet, Central Kitchen, dan korporat. Reminder hanya ke tim Legal.</>}>
-        <PermitForm units={units} types={types} members={members} me={me} />
-      </PageHeader>
-
+    <div>
       {isDemo && <div className="mb-4"><Notice tone="info">Ini <b>data contoh</b> untuk uji coba. Data asli bisa diimpor nanti dari Excel.</Notice></div>}
 
-      <nav className="mb-3 flex gap-1.5 overflow-x-auto pb-1" aria-label="Filter cepat">
-        {QUICK.map((x) => {
-          const n = base.filter((p) => matchQuick(p, x.key)).length;
-          const on = t === x.key;
-          return (
-            <Link key={x.key} href={href({ t: x.key || undefined, d: undefined })} scroll={false}
-              className={cx("chip h-8 shrink-0 border px-3 text-[13px]", on ? "border-ink bg-ink text-white" : "border-line bg-surface text-ink-2 hover:text-ink")}>
-              {x.label} <span className={cx("tnum", on ? "text-white/70" : "text-ink-3")}>{n}</span>
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div className="card mb-4 p-3">
-        <FilterBar q={sp.q} hidden={{ t: sp.t }}>
-          <select name="pic" defaultValue={pic} className="input h-10 sm:w-auto" aria-label="PIC Legal">
-            <option value="me">PIC: saya</option>
-            <option value="all">Semua PIC</option>
-            {members.filter((m) => m.id !== me.id).map((m) => <option key={m.id} value={m.id}>PIC: {m.name}</option>)}
-          </select>
-          <select name="brand" defaultValue={sp.brand ?? ""} className="input h-10 sm:w-auto" aria-label="Brand">
-            <option value="">Semua brand</option>
-            {brands.map((b) => <option key={b.id} value={b.name}>{b.name}</option>)}
-            <option value="—">Tanpa brand (CK/HO)</option>
-          </select>
-          <select name="scope" defaultValue={sp.scope ?? ""} className="input h-10 sm:w-auto" aria-label="Scope">
-            <option value="">Semua scope</option>
-            {Object.entries(SCOPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
-          <select name="r" defaultValue={sp.r ?? ""} className="input h-10 sm:w-auto" aria-label="Status renewal">
-            <option value="">Semua status renewal</option>
-            {Object.entries(RENEWAL_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
-        </FilterBar>
+      <div className="mb-3.5 flex flex-wrap items-center gap-3">
+        <nav className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-1" aria-label="Filter cepat">
+          {QUICK.map((x) => {
+            const n = base.filter((p) => matchQuick(p, x.key)).length;
+            const on = t === x.key;
+            return (
+              <Link key={x.key} href={href({ t: x.key || undefined, d: undefined })} scroll={false} aria-current={on ? "true" : undefined}
+                className={cx("inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-[12.5px] font-semibold hover:no-underline", on ? "border-brand-line bg-brand-subtle text-brand-hover" : "border-line bg-surface text-ink-2 hover:text-ink")}>
+                {x.label} <span className={cx("font-mono text-[11px]", on ? "text-brand" : "text-ink-3")}>{n}</span>
+              </Link>
+            );
+          })}
+        </nav>
+        <PermitForm units={units} types={types} members={members} me={me} />
       </div>
 
-      <p className="mb-2 px-1 text-[13px] text-ink-3">
-        {rows.length} dokumen{picName ? <> · PIC {picName}</> : null}
-        {(sp.q || sp.brand || sp.scope || sp.r || t || (sp.pic && sp.pic !== (me.role === "staff" ? "me" : "all"))) && <> · <Link href="/perizinan" className="font-semibold text-brand">Reset filter</Link></>}
-      </p>
-
       <section className="card overflow-hidden">
+        <div className="flex flex-col gap-2 border-b border-line-2 p-4 md:px-5 lg:flex-row lg:items-center">
+          <div className="min-w-0 flex-1">
+            <FilterBar q={sp.q} hidden={{ t: sp.t }}>
+              <select name="pic" defaultValue={pic} className="input sm:w-auto" aria-label="PIC Legal">
+                <option value="me">PIC: saya</option>
+                <option value="all">Semua PIC</option>
+                {members.filter((m) => m.id !== me.id).map((m) => <option key={m.id} value={m.id}>PIC: {m.name}</option>)}
+              </select>
+              <select name="brand" defaultValue={sp.brand ?? ""} className="input sm:w-auto" aria-label="Brand">
+                <option value="">Semua brand</option>
+                {brands.map((b) => <option key={b.id} value={b.name}>{b.name}</option>)}
+                <option value="—">Tanpa brand (CK/HO)</option>
+              </select>
+              <select name="scope" defaultValue={sp.scope ?? ""} className="input sm:w-auto" aria-label="Scope">
+                <option value="">Semua scope</option>
+                {Object.entries(SCOPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+              <select name="r" defaultValue={sp.r ?? ""} className="input sm:w-auto" aria-label="Status renewal">
+                <option value="">Semua status renewal</option>
+                {Object.entries(RENEWAL_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </FilterBar>
+          </div>
+          <p className="shrink-0 font-mono text-[12px] text-ink-3">
+            {rows.length} dokumen{picName ? <> · PIC {picName}</> : null}
+            {(sp.q || sp.brand || sp.scope || sp.r || t || (sp.pic && sp.pic !== (me.role === "staff" ? "me" : "all"))) && <> · <Link href="/perizinan" className="font-sans font-semibold text-brand">Reset</Link></>}
+          </p>
+        </div>
+
         {rows.length === 0 ? (
           <Empty title="Tidak ada dokumen yang cocok">Coba ubah filter atau kata kunci.{pic === "me" && <> Anda sedang melihat dokumen milik Anda saja — <Link className="font-semibold text-brand" href={href({ pic: "all" })}>lihat semua PIC</Link>.</>}</Empty>
         ) : (
           <>
-            <table className="hidden w-full text-left text-[14px] lg:table">
-              <thead className="border-b border-line bg-bg text-[12px] font-semibold tracking-wide text-ink-3 uppercase">
+            <table className="hidden w-full text-left text-[13px] lg:table">
+              <thead className="border-b border-line bg-[#fafbfc] text-[11px] font-bold tracking-[0.6px] whitespace-nowrap text-ink-3 uppercase">
                 <tr>
-                  <th className="px-4 py-2.5">Jenis izin</th>
-                  <th className="px-3 py-2.5">Unit</th>
-                  <th className="px-3 py-2.5">Jatuh tempo</th>
-                  <th className="px-3 py-2.5">Sisa</th>
-                  <th className="px-3 py-2.5">Status renewal</th>
-                  <th className="px-3 py-2.5">PIC Legal</th>
+                  <th className="px-5 py-2.5 font-bold">Dokumen</th>
+                  <th className="px-3 py-2.5 font-bold">Outlet / Brand</th>
+                  <th className="px-3 py-2.5 font-bold">PIC Legal</th>
+                  <th className="px-3 py-2.5 font-bold">Expiry</th>
+                  <th className="px-3 py-2.5 font-bold">Sisa</th>
+                  <th className="px-3 py-2.5 font-bold">Renewal</th>
                   <th className="px-3 py-2.5"><span className="sr-only">Info</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line-2">
                 {rows.map((p) => (
-                  <tr key={p.id} className={cx("group relative hover:bg-bg", sp.d === p.code && "bg-brand-subtle")}>
-                    <td className="px-4 py-3">
-                      <Link href={href({ d: p.code })} scroll={false} className="font-semibold after:absolute after:inset-0 group-hover:text-brand">{p.type_name}</Link>
-                      <div className="font-mono text-[12px] text-ink-3">{p.code} · {p.number ?? "tanpa nomor"}</div>
+                  <tr key={p.id} className={cx("group relative hover:bg-[#fafbfc]", sp.d === p.code && "bg-brand-subtle")}>
+                    <td className="px-5 py-3">
+                      <Link href={href({ d: p.code })} scroll={false} className="font-bold text-ink after:absolute after:inset-0 group-hover:text-brand hover:no-underline">{p.type_name}</Link>
+                      <div className="font-mono text-[10.5px] text-ink-3">{p.number ?? "tanpa nomor"} · {p.code}</div>
                     </td>
                     <td className="px-3 py-3">
-                      <div className="font-medium">{p.unit_name}</div>
-                      <div className="text-[12.5px] text-ink-3">{p.brand ?? SCOPE_LABEL[p.scope]}{p.city ? ` · ${p.city}` : ""}</div>
+                      <div className="font-semibold">{p.unit_name}</div>
+                      <div className="text-[11.5px] text-ink-3">{p.brand ?? SCOPE_LABEL[p.scope]}{p.city ? ` · ${p.city}` : ""}</div>
                     </td>
-                    <td className="px-3 py-3 tnum whitespace-nowrap">{p.expiry_date ? formatDate(p.expiry_date) : "—"}</td>
-                    <td className="px-3 py-3"><span className={cx("chip font-mono", TIME_CHIP[timeStatus(p.days)])}>{daysText(p.days)}</span></td>
+                    <td className="px-3 py-3">
+                      <div className={cx("font-medium", p.pic_id === me.id && "text-brand")}>{shortName(p.pic_name)}</div>
+                    </td>
+                    <td className="px-3 py-3 font-mono text-[12px] whitespace-nowrap">{p.expiry_date ? formatDate(p.expiry_date) : "—"}</td>
+                    <td className="px-3 py-3"><span className={cx("inline-block rounded-md px-2 py-[3px] font-mono text-[11px] font-semibold whitespace-nowrap", TIME_CHIP[timeStatus(p.days)])}>{daysText(p.days)}</span></td>
                     <td className="px-3 py-3"><RenewalCell p={p} /></td>
-                    <td className="px-3 py-3">
-                      <span className="flex items-center gap-2"><Avatar name={p.pic_name} size={24} tone={p.pic_id === me.id ? "brand" : "ink"} /><span className="text-[13.5px]">{shortName(p.pic_name)}</span></span>
-                    </td>
                     <td className="px-3 py-3"><Icons p={p} /></td>
                   </tr>
                 ))}
@@ -167,19 +167,19 @@ export default async function Perizinan({ searchParams }: { searchParams: Promis
             <ul className="divide-y divide-line-2 lg:hidden">
               {rows.map((p) => (
                 <li key={p.id}>
-                  <Link href={href({ d: p.code })} scroll={false} className="flex items-start gap-3 px-4 py-3.5 active:bg-bg">
+                  <Link href={href({ d: p.code })} scroll={false} className="flex items-start gap-3 px-4 py-3.5 hover:no-underline active:bg-bg">
                     <div className="min-w-0 flex-1">
-                      <div className="font-semibold leading-snug">{p.type_name}</div>
-                      <div className="mt-0.5 text-[13px] text-ink-2">{p.unit_name}</div>
-                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <div className="font-bold leading-snug text-ink">{p.type_name}</div>
+                      <div className="mt-0.5 text-[12.5px] text-ink-2">{p.unit_name}</div>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
                         <RenewalCell p={p} />
                         <Icons p={p} />
                         <span className="text-[12px] text-ink-3">{shortName(p.pic_name)}</span>
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className={cx("chip font-mono", TIME_CHIP[timeStatus(p.days)])}>{daysText(p.days)}</span>
-                      <div className="mt-1 text-[12px] text-ink-3 tnum">{p.expiry_date ? formatDate(p.expiry_date) : ""}</div>
+                      <span className={cx("inline-block rounded-md px-2 py-[3px] font-mono text-[11px] font-semibold whitespace-nowrap", TIME_CHIP[timeStatus(p.days)])}>{daysText(p.days)}</span>
+                      <div className="mt-1 font-mono text-[11px] text-ink-3">{p.expiry_date ? formatDate(p.expiry_date) : ""}</div>
                     </div>
                   </Link>
                 </li>
@@ -195,9 +195,9 @@ export default async function Perizinan({ searchParams }: { searchParams: Promis
 }
 
 function RenewalCell({ p }: { p: PermitRow }) {
-  if (!inWindow(p) && p.renewal_status === "belum") return <span className="text-[13px] text-ink-3">Aktif</span>;
-  const tone = p.renewal_status === "submitted" ? "bg-info-bg text-info" : p.renewal_status === "proses" ? "bg-warn-bg text-warn" : "bg-bad-bg text-bad";
-  return <span className={cx("chip", tone)}>{RENEWAL_LABEL[p.renewal_status]}</span>;
+  if (!inWindow(p) && p.renewal_status === "belum") return <span className="text-[12.5px] text-ink-3">Aktif</span>;
+  const tone = p.renewal_status === "submitted" ? "text-info" : p.renewal_status === "proses" ? "text-ink" : "text-brand";
+  return <span className={cx("text-[13px] font-semibold", tone)}>{RENEWAL_LABEL[p.renewal_status]}</span>;
 }
 
 function Icons({ p }: { p: PermitRow }) {

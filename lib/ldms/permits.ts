@@ -25,14 +25,14 @@ export const TIME_LABEL: Record<TimeStatus, string> = {
   nodate: "Tanpa tanggal",
 };
 
-/** Chip colours: overdue/today solid red · ≤7 pink · ≤30 amber · ≤60 yellow · safe grey-green. */
+/** Chip colours (LDMS design): overdue/today solid red · ≤7 pink · ≤30 amber · ≤60 yellow · safe grey-green. */
 export const TIME_CHIP: Record<TimeStatus, string> = {
   overdue: "bg-brand text-white",
   today: "bg-brand text-white",
-  d7: "bg-brand-soft text-brand-deep",
-  d30: "bg-warn-bg text-warn",
-  d60: "bg-[#fefce8] text-[#854d0e]",
-  safe: "bg-ok-bg text-ok",
+  d7: "bg-[#fde7e9] text-[#a5161f]",
+  d30: "bg-[#fff4e2] text-[#8a5a0b]",
+  d60: "bg-[#fffbe8] text-[#6b5c10]",
+  safe: "bg-[#f0f3f1] text-[#3f5a4d]",
   nodate: "bg-mute-bg text-ink-2",
 };
 
@@ -46,11 +46,12 @@ export function timeStatus(days: number | null): TimeStatus {
   return "safe";
 }
 
+/** "Overdue 43h", "Hari ini", "H-12" — the countdown chip text used across LDMS. */
 export function daysText(days: number | null): string {
   if (days === null) return "—";
-  if (days < 0) return `Terlewat ${-days} hari`;
+  if (days < 0) return `Overdue ${-days}h`;
   if (days === 0) return "Hari ini";
-  return `${days} hari`;
+  return `H-${days}`;
 }
 
 /** Renewal reminder ladder from the lead time: H-lead, H-lead/2, H-7, H-1 (blueprint §5.7). */

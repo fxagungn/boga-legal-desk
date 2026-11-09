@@ -241,3 +241,17 @@ Tiap fase: commit ke branch ini → Vercel preview → user cek → lanjut.
 | `AUTH_SECRET`, `CRON_SECRET` | Sesi login & proteksi cron |
 | `GOOGLE_SERVICE_ACCOUNT_JSON`, `EMPLOYEE_SHEET_ID` | Sinkron tim Legal (share sheet ke email service account sebagai Viewer) |
 | `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_MAILBOX` | Kirim email reminder (Fase 2) |
+
+## 12. Update v9 (9 Nov 2026) — seluruh modul blueprint
+- Modul baru: MLA · ULA · PKS · PSM (+ validator ULA vs outlet, notice), Reminder Engine (antrean, preview email, simulasi/kirim, outbox, weekly digest, acknowledge via link email), Pengajuan & Approval sanksi (matrix, AI verifikasi, Legal → HR via link aman, alasan pembeda wajib, tercatat ke KB), Terapkan Matrix (AI) + draft surat ST/SP, Matrix Disiplin 72 kode, Knowledge Base (Google Docs 7 heading), Government Inspection + AI, Library + konsultasi AI, Audit trail, Tanya LDMS (chat mengambang + halaman penuh, tools ke DB & Google Drive).
+- Admin Console (Super Admin): hak akses peran × modul, tim & peran, alur reminder/sanksi, master data (outlet, jenis izin, brand, impor LIST OUTLET & registry), Google Drive, AI + log AI, sistem.
+- Google Drive repository: Shared Drive folder → LDMS_DB (mirror semua tabel), Google Doc KB, index Docs/Sheets untuk Tanya LDMS.
+- Data contoh v2 memakai outlet dari daftar outlet publik Boga Group; semua ditandai CONTOH dan bisa dihapus di Admin Console → Sistem.
+
+### Env tambahan
+| Env | Untuk |
+|---|---|
+| `ANTHROPIC_API_KEY` | Tanya LDMS & semua fitur AI |
+| `SUPER_ADMIN_NIK` | (opsional) NIK Super Admin awal; tanpa ini akun peran Admin = Super Admin |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Sinkron karyawan + repository Google Drive |
+| `RESEND_API_KEY`, `RESEND_FROM` | (nanti) kirim email reminder; sampai diisi Reminder Engine berjalan sebagai simulasi |

@@ -7,7 +7,9 @@ import { canBypassMaintenance, currentMember } from "@/lib/repo";
 import { ROLE_LABEL } from "@/lib/workflow";
 import { logout } from "@/app/actions";
 import { initials } from "@/lib/format";
-import { canPreview } from "@/lib/nav";
+import { NAV_ITEMS } from "@/lib/nav";
+import { can, getAccess, isSuperAdmin } from "@/lib/access";
+import { ChatWidget } from "@/components/chat/ChatWidget";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +25,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     [me.id],
   ), query<{ n: number }>(`select count(*)::int as n from permits p join units u on u.id = p.unit_id where u.status = 'aktif'`)]);
   const badges = { "/perizinan": { n: mine[0]?.n || total[0]?.n || 0, hot: Boolean(mine[0]?.n) } };
-  const preview = canPreview(me.role);
+  const access = await getAccess();
+  const superAdmin = isSuperAdmin(me);
+  const allowed = NAV_ITEMS.filter((i) => (i.superAdmin ? superAdmin : !i.module || can(access, me, i.module, "view"))).map((i) => i.href);
+  const chatOk = can(access, me, "chat", "view");
   const roleTitle = me.title ?? ROLE_LABEL[me.role];
   const userCard = (
     <div className="border-t border-line-2 px-1.5 pt-4">
@@ -65,12 +70,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </span>
         </a>
         <div className="flex-1 overflow-y-auto px-3 pt-3">
-          <SideNav badges={badges} preview={preview} />
+          <SideNav badges={badges} allowed={allowed} />
         </div>
         <div className="px-3.5 pb-4">{userCard}</div>
       </aside>
 
-      <MobileNav badges={badges} preview={preview} footer={userCard} />
+      <MobileNav badges={badges} allowed={allowed} footer={userCard} />
 
       <div className="min-w-0 flex-1">
       <TopBar name={me.name} title={roleTitle} initials={initials(me.name)} />
@@ -93,6 +98,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {children}
       </main>
       </div>
+      {chatOk && <ChatWidget name={me.name} />}
       <Toaster />
     </div>
   );

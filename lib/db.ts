@@ -1,6 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { DEFAULT_WORKFLOWS, type Workflows } from "./workflow";
 import { LDMS_MIGRATION } from "./ldms/schema";
+import { LDMS_MIGRATION_V9 } from "./ldms/schema2";
 
 export const hasDb = () => Boolean(dbUrl());
 const dbUrl = () => process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.DATABASE_URL_UNPOOLED || "";
@@ -26,7 +27,7 @@ function raw(): Client {
   return client;
 }
 
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
 
 const MIGRATION = [
   `create table if not exists app_settings (key text primary key, value jsonb not null, updated_at timestamptz not null default now())`,
@@ -159,6 +160,8 @@ const MIGRATION = [
      where t.id = k.id and k.id <> k.keep`,
   // v8: LDMS (perizinan, catatan, file, reminder, audit)
   ...LDMS_MIGRATION,
+  // v9: agreements, matrix & punishment, KB, inspections, library, AI log, chat, Drive index, super admin
+  ...LDMS_MIGRATION_V9,
 ];
 
 let ready: Promise<void> | null = null;
@@ -177,6 +180,9 @@ export function ensureSchema(): Promise<void> {
       await seedIfEmpty();
       await applyTeamRoster();
       await (await import("./ldms/seed")).seedLdms(q);
+      const s2 = await import("./ldms/seed2");
+      await s2.seedMatrix(q);
+      await s2.seedDemoV2(q);
       await q.query(
         `insert into app_settings (key, value) values ('schema_version', $1::jsonb)
          on conflict (key) do update set value = excluded.value, updated_at = now()`,

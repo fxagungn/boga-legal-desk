@@ -77,7 +77,7 @@ export default async function Perizinan({ searchParams }: { searchParams: Promis
 
   return (
     <div>
-      {isDemo && <div className="mb-4"><Notice tone="info">Ini <b>data contoh</b> untuk uji coba. Data asli bisa diimpor nanti dari Excel.</Notice></div>}
+      {isDemo && <div className="mb-4"><Notice tone="info">Sebagian registry masih <b>data contoh</b> (outlet asli Boga Group, nomor & tanggal izin fiktif). Data asli diimpor Super Admin di Admin Console → Master data → Impor registry izin.</Notice></div>}
 
       <div className="mb-3.5 flex flex-wrap items-center gap-3">
         <nav className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-1" aria-label="Filter cepat">

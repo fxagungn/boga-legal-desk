@@ -15,15 +15,16 @@ export interface Member {
   must_change_password?: boolean;
   has_password?: boolean;
   last_login_at?: string | Date | null;
+  is_super_admin?: boolean;
 }
 
 export async function listMembers(activeOnly = false) {
-  return query<Member>(`select id, name, role, email, whatsapp, active, title, nik, must_change_password, password_hash is not null as has_password, last_login_at from team_members ${activeOnly ? "where active" : ""} order by
+  return query<Member>(`select id, name, role, email, whatsapp, active, title, nik, must_change_password, password_hash is not null as has_password, last_login_at, is_super_admin from team_members ${activeOnly ? "where active" : ""} order by
     case role when 'staff' then 1 when 'supervisor' then 2 when 'manager' then 3 when 'agm' then 4 when 'cpo' then 5 else 6 end, name`);
 }
 
 export async function getMember(id: number) {
-  return one<Member>(`select id, name, role, email, whatsapp, active, title, nik, must_change_password, password_hash is not null as has_password, last_login_at from team_members where id = $1`, [id]);
+  return one<Member>(`select id, name, role, email, whatsapp, active, title, nik, must_change_password, password_hash is not null as has_password, last_login_at, is_super_admin from team_members where id = $1`, [id]);
 }
 
 /** The currently signed-in member, or null. */
@@ -35,7 +36,7 @@ export async function currentMember(): Promise<Member | null> {
   return m && m.active ? m : null;
 }
 
-export const canBypassMaintenance = (m: Member) => ["manager", "agm", "admin"].includes(m.role);
+export const canBypassMaintenance = (m: Member) => ["manager", "agm", "admin"].includes(m.role) || Boolean(m.is_super_admin);
 
 /** Signed-in member allowed to change data (blocks first-login and maintenance). */
 export async function requireMember(): Promise<Member> {

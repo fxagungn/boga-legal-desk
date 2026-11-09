@@ -28,8 +28,8 @@ function html(m: Message) {
   return `<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1b2a3a;max-width:560px">
     <p style="font-size:16px;font-weight:600;margin:0 0 12px">${esc(m.lines[0] ?? m.subject)}</p>
     ${m.lines.slice(1).map((l) => `<p style="margin:0 0 6px">${esc(l)}</p>`).join("")}
-    ${m.link ? `<p style="margin:18px 0"><a href="${m.link}" style="background:#0f5f66;color:#fff;padding:9px 16px;border-radius:6px;text-decoration:none">Buka di Legal Desk</a></p>` : ""}
-    <p style="color:#6b7785;font-size:12px;margin-top:24px">Notifikasi otomatis Legal Desk.</p></div>`;
+    ${m.link ? `<p style="margin:18px 0"><a href="${m.link}" style="background:#C41E29;color:#fff;padding:9px 16px;border-radius:6px;text-decoration:none">Buka di LDMS</a></p>` : ""}
+    <p style="color:#6b7785;font-size:12px;margin-top:24px">Notifikasi otomatis Legal DMS Boga Group.</p></div>`;
 }
 
 const normalizePhone = (p: string) => {
@@ -119,4 +119,27 @@ export async function notify(members: Member[], m: Message): Promise<number> {
     }
   }
   return sent;
+}
+
+/** Send a ready-made HTML email (reminders, HR approval links). UAT mode redirects everything to the tester. */
+export async function sendRaw(to: string[], cc: string[], subject: string, htmlBody: string) {
+  const settings = await getSettings();
+  if (settings.uatMode) {
+    if (!settings.uatRecipient.trim()) return;
+    subject = `[UAT] ${subject} (aslinya untuk ${[...to, ...cc].join(", ")})`;
+    to = [settings.uatRecipient.trim()];
+    cc = [];
+  }
+  const ch = emailChannel();
+  if (ch === "graph") return sendMail([...to, ...cc], subject, htmlBody);
+  if (ch === "resend") {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { authorization: `Bearer ${process.env.RESEND_API_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify({ from: process.env.RESEND_FROM || "Legal DMS <onboarding@resend.dev>", to, cc: cc.length ? cc : undefined, subject, html: htmlBody }),
+    });
+    if (!res.ok) throw new Error(`Resend ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    return;
+  }
+  throw new Error("Belum ada kanal email (Resend / Microsoft 365).");
 }

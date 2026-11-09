@@ -2,33 +2,32 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Menu, Settings, ShieldCheck, X } from "lucide-react";
+import { Gavel, LayoutDashboard, Menu, ShieldCheck, X } from "lucide-react";
 import { isActive, NAV, NAV_ITEMS, navFor } from "@/lib/nav";
 import { cx } from "./ui";
 
-export function SideNav({ badges = {}, preview = false, onNavigate }: { badges?: Record<string, { n: number; hot?: boolean }>; preview?: boolean; onNavigate?: () => void }) {
+export function SideNav({ badges = {}, allowed, onNavigate }: { badges?: Record<string, { n: number; hot?: boolean }>; allowed: string[]; onNavigate?: () => void }) {
   const path = usePathname();
   let n = 0;
   return (
     <nav aria-label="Menu utama" className="flex flex-col gap-0.5">
-      {NAV.map((g) => (
+      {NAV.map((g) => g.items.some((it) => allowed.includes(it.href)) && (
         <div key={g.label} className="mb-1.5">
           <p className="mt-2 mb-1.5 px-2 text-[10.5px] font-bold tracking-[0.9px] text-ink-3 uppercase">{g.label}</p>
-          {g.items.map((it) => {
-            const num = it.href === "/settings" ? "··" : String(++n).padStart(2, "0");
+          {g.items.filter((it) => allowed.includes(it.href)).map((it) => {
+            const num = g.label === "Lainnya" ? "··" : String(++n).padStart(2, "0");
             const on = isActive(path, it.href);
-            const soon = Boolean(it.preview) && !preview;
             const b = badges[it.href];
             return (
               <Link key={it.href} href={it.href} onClick={onNavigate} aria-current={on ? "page" : undefined}
                 className={cx("flex items-center gap-2.5 rounded-lg border px-2.5 py-[6px] text-[13px] transition-colors",
                   on ? "border-brand-line bg-brand-subtle font-bold text-brand-hover" : "border-transparent font-medium hover:bg-mute-bg",
-                  !on && (soon ? "text-ink-3" : "text-[#3a4048]"))}>
+                  !on && "text-[#3a4048]")}>
                 <span className={cx("w-[18px] shrink-0 font-mono text-[11px]", on ? "text-brand" : "text-ink-3")}>{num}</span>
                 <span className="min-w-0 flex-1 leading-snug">{it.label}</span>
                 {b && b.n > 0 ? (
                   <span className={cx("rounded-[5px] px-1.5 py-px font-mono text-[10.5px] font-semibold", b.hot ? "bg-brand-soft text-brand" : "bg-mute-bg text-ink-2")}>{b.n}</span>
-                ) : soon ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-line" title="Segera hadir"><span className="sr-only">segera hadir</span></span> : null}
+                ) : null}
               </Link>
             );
           })}
@@ -68,7 +67,7 @@ export function TopBar({ name, title, initials }: { name: string; title: string;
 }
 
 /** Phone: title bar with a menu sheet, plus a bottom bar for the screens people use most. */
-export function MobileNav({ badges = {}, preview = false, footer }: { badges?: Record<string, { n: number; hot?: boolean }>; preview?: boolean; footer: React.ReactNode }) {
+export function MobileNav({ badges = {}, allowed, footer }: { badges?: Record<string, { n: number; hot?: boolean }>; allowed: string[]; footer: React.ReactNode }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
   useEffect(() => setOpen(false), [path]);
@@ -76,7 +75,7 @@ export function MobileNav({ badges = {}, preview = false, footer }: { badges?: R
   const tabs = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/perizinan", label: "Registry", icon: ShieldCheck },
-    { href: "/settings", label: "Pengaturan", icon: Settings },
+    { href: "/sanksi", label: "Sanksi", icon: Gavel },
   ];
   return (
     <>
@@ -97,7 +96,7 @@ export function MobileNav({ badges = {}, preview = false, footer }: { badges?: R
               <span className="text-[14px] font-extrabold">Menu</span>
               <button type="button" className="btn btn-ghost btn-sm px-2" aria-label="Tutup menu" onClick={() => setOpen(false)}><X size={18} /></button>
             </div>
-            <SideNav badges={badges} preview={preview} onNavigate={() => setOpen(false)} />
+            <SideNav badges={badges} allowed={allowed} onNavigate={() => setOpen(false)} />
             <div className="mt-auto pt-3">{footer}</div>
           </div>
         </div>

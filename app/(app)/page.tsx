@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { daysText, inWindow, listPermits, needsAck, RENEWAL_LABEL, shortName, TIME_CHIP, timeStatus, type PermitRow } from "@/lib/ldms/permits";
-import { formatDate } from "@/lib/time";
+import { searchRows } from "@/lib/ldms/search";
+import { getFlows } from "@/lib/flows";
+import { query } from "@/lib/db";
+import { formatDate, formatDateTime } from "@/lib/time";
 import { cx } from "@/components/ui";
-import { GlobalSearch, type SearchRow } from "@/components/dashboard/GlobalSearch";
+import { GlobalSearch } from "@/components/dashboard/GlobalSearch";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +14,10 @@ const isOverdue = (p: PermitRow) => p.days !== null && p.days < 0;
 const due30 = (p: PermitRow) => p.days !== null && p.days >= 0 && p.days <= 30;
 
 export default async function Dashboard() {
-  const permits = await listPermits();
+  const [permits, search, flows, recent] = await Promise.all([
+    listPermits(), searchRows(), getFlows(),
+    query<{ id: number; at: string; actor: string | null; action: string; entity: string; entity_id: string | null; detail: string | null }>(`select id, at, actor, action, entity, entity_id, detail from audit_log order by at desc limit 10`),
+  ]);
 
   const overdue = permits.filter(isOverdue);
   const soon = permits.filter(due30);
@@ -43,11 +49,6 @@ export default async function Dashboard() {
 
   const action = permits.filter((p) => inWindow(p) || needsAck(p)).sort((a, b) => urgency(a) - urgency(b));
 
-  const search: SearchRow[] = permits.map((p) => ({
-    code: p.code, type: p.type_name, unit: p.unit_name, number: p.number, pic: shortName(p.pic_name), brand: p.brand, city: p.city,
-    days: p.days, renewal: RENEWAL_LABEL[p.renewal_status], inWindow: inWindow(p), somasi: needsAck(p), belum: inWindow(p) && p.renewal_status === "belum",
-  }));
-
   return (
     <div className="space-y-5">
       <GlobalSearch rows={search} />
@@ -77,7 +78,8 @@ export default async function Dashboard() {
             ))}
           </ul>
           <p className="mt-5 rounded-[10px] border border-brand-line bg-brand-subtle px-4 py-3 text-[12.5px] leading-relaxed text-brand-deep">
-            <b>Eskalasi internal Legal.</b> Ambang pertama mengikuti jenis izin dan hanya ke Legal Officer pemegang dokumen. Berikutnya CC Legal Manager, lalu Head of Legal. Overdue dikirim harian sampai izin terbit. Notifikasi tidak dikirim ke PIC outlet.
+            <b>Eskalasi internal Legal.</b> Ambang pertama mengikuti jenis izin dan hanya ke Legal Officer pemegang dokumen; berikutnya CC Legal Supervisor, lalu Head of Legal; overdue harian sampai izin terbit. Tidak dikirim ke PIC outlet.{" "}
+            {flows.reminder.sendEnabled ? <b>Pengiriman email aktif.</b> : <><b>Saat ini pengiriman email belum aktif</b> — lihat antrean di <Link href="/reminder" className="font-semibold underline">Reminder Engine</Link>.</>}
           </p>
         </section>
 
@@ -140,6 +142,25 @@ export default async function Dashboard() {
               </tbody>
             </table>
           </div>
+        )}
+      </section>
+
+      <section className="card overflow-hidden">
+        <header className="flex items-center justify-between gap-3 px-5 py-4">
+          <h2 className="text-[15px] font-extrabold tracking-[-0.2px]">Audit trail</h2>
+          <Link href="/audit" className="btn btn-sm">Lihat semua</Link>
+        </header>
+        {recent.length === 0 ? <p className="border-t border-line-2 px-5 py-6 text-center text-[13px] text-ink-2">Belum ada aktivitas.</p> : (
+          <ul className="divide-y divide-line-2 border-t border-line-2">
+            {recent.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-baseline gap-x-2 px-5 py-2.5 text-[13px]">
+                <span className="w-[120px] shrink-0 font-mono text-[11.5px] text-ink-3">{formatDateTime(a.at)}</span>
+                <b>{shortName(a.actor)}</b> <span className="text-ink-2">{a.action}</span>
+                <span className="font-mono text-[11.5px] text-ink-3">{a.entity}{a.entity_id ? ` ${a.entity_id}` : ""}</span>
+                {a.detail && <span className="min-w-0 flex-1 truncate text-ink-2">— {a.detail}</span>}
+              </li>
+            ))}
+          </ul>
         )}
       </section>
     </div>

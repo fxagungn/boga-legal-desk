@@ -45,7 +45,7 @@ export async function PermitDrawer({ code, me, closeHref }: { code: string; me: 
           {/* banners */}
           {(ts === "overdue" || ts === "today") && (
             <Banner tone="bad" icon={AlertTriangle}>
-              {ts === "overdue" ? <>Izin ini <b>sudah kedaluwarsa {-p.days!} hari</b>. Reminder harian dikirim ke PIC, Supervisor, Head, dan Director Legal.</> : <>Izin ini <b>jatuh tempo hari ini</b>. Besok masuk status kedaluwarsa.</>}
+              {ts === "overdue" ? <>Izin ini <b>sudah kedaluwarsa {-p.days!} hari</b>. Masuk antrean reminder harian ke PIC, Supervisor, Head, dan Director Legal (lihat Reminder Engine).</> : <>Izin ini <b>jatuh tempo hari ini</b>. Besok masuk status kedaluwarsa.</>}
             </Banner>
           )}
           {windowOpen && p.blocker_note && p.renewal_status !== "submitted" && <Banner tone="warn" icon={Info}>Blocker umum: {p.blocker_note}</Banner>}
@@ -122,7 +122,7 @@ export async function PermitDrawer({ code, me, closeHref }: { code: string; me: 
                         <input type="hidden" name="id" value={p.id} />
                         <Submit className="btn btn-primary btn-sm">Acknowledge — saya terima & tindak lanjuti</Submit>
                       </ActionForm>
-                    ) : <span className="text-[13px] font-semibold text-brand">Menunggu acknowledge dari PIC. Reminder harian berjalan.</span>
+                    ) : <span className="text-[13px] font-semibold text-brand">Menunggu acknowledge dari PIC. Masuk antrean reminder somasi harian.</span>
                   ) : (
                     <span className="flex items-center gap-1.5 text-[13px] font-semibold text-ok"><BadgeCheck size={15} /> Di-acknowledge {p.ack_by} · {formatDateTime(p.ack_at!)} via {p.ack_via}</span>
                   )}
@@ -137,7 +137,7 @@ export async function PermitDrawer({ code, me, closeHref }: { code: string; me: 
               </div>
             ) : canManageSomasi(me) ? (
               <ActionDialog action={P.markSomasiAction} id={p.id} triggerClass="btn btn-sm" trigger={<><ShieldAlert size={15} /> Tandai bersomasi & wajibkan acknowledge</>}
-                title="Tandai bersomasi" desc="PIC wajib acknowledge. Sampai di-acknowledge, reminder somasi dikirim setiap hari ke PIC dan Supervisor." submit="Tandai bersomasi">
+                title="Tandai bersomasi" desc="PIC wajib acknowledge. Sampai di-acknowledge, dokumen ini masuk antrean reminder somasi harian ke PIC dan Supervisor." submit="Tandai bersomasi">
                 <label className="label" htmlFor="ms-text">Nomor / perihal somasi</label>
                 <textarea id="ms-text" name="somasi_text" rows={3} required minLength={10} className="input" placeholder="mis. Somasi I — pengelola mal: signage tanpa izin berlaku, diminta diturunkan dalam 7 hari." />
               </ActionDialog>

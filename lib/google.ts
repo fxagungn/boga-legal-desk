@@ -53,3 +53,126 @@ export async function readSheet(spreadsheetId: string, range: string): Promise<u
   if (!res.ok) throw new Error(`Google Sheets ${res.status}: ${(await res.text()).slice(0, 200)}`);
   return ((await res.json()) as { values?: unknown[][] }).values ?? [];
 }
+
+/* ---------- Drive, Sheets & Docs (LDMS repository in a Shared Drive) ---------- */
+
+const RW = "https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/documents";
+
+async function gfetch<T>(url: string, init: RequestInit = {}): Promise<T> {
+  const token = await accessToken(RW);
+  const res = await fetch(url, { ...init, headers: { authorization: `Bearer ${token}`, "content-type": "application/json", ...(init.headers ?? {}) }, cache: "no-store" });
+  if (res.status === 403 || res.status === 404) {
+    throw new Error(`Google ${res.status}: file/folder tidak bisa diakses. Pastikan sudah di-share (Editor) ke ${googleAccountEmail()}. ${(await res.text()).slice(0, 160)}`);
+  }
+  if (!res.ok) throw new Error(`Google ${res.status}: ${(await res.text()).slice(0, 240)}`);
+  const ct = res.headers.get("content-type") ?? "";
+  return (ct.includes("json") ? await res.json() : await res.text()) as T;
+}
+
+/** Folder / file id from a Drive URL (or the id itself). */
+export function driveIdFromUrl(url: string): string {
+  const s = url.trim();
+  const m = s.match(/\/folders\/([\w-]{10,})/) || s.match(/\/d\/([\w-]{10,})/) || s.match(/[?&]id=([\w-]{10,})/);
+  return m ? m[1] : /^[\w-]{10,}$/.test(s) ? s : "";
+}
+
+export interface DriveFile { id: string; name: string; mimeType: string; modifiedTime: string; webViewLink?: string; path: string }
+
+export async function driveGet(id: string) {
+  return gfetch<{ id: string; name: string; mimeType: string; driveId?: string; webViewLink?: string }>(
+    `https://www.googleapis.com/drive/v3/files/${id}?fields=id,name,mimeType,driveId,webViewLink&supportsAllDrives=true`,
+  );
+}
+
+/** Every file under a folder (recursive, max depth 4). */
+export async function driveListFolder(folderId: string, path = "", depth = 0): Promise<DriveFile[]> {
+  const out: DriveFile[] = [];
+  let pageToken = "";
+  do {
+    const q = encodeURIComponent(`'${folderId}' in parents and trashed = false`);
+    const r = await gfetch<{ files: Omit<DriveFile, "path">[]; nextPageToken?: string }>(
+      `https://www.googleapis.com/drive/v3/files?q=${q}&fields=nextPageToken,files(id,name,mimeType,modifiedTime,webViewLink)&pageSize=200&supportsAllDrives=true&includeItemsFromAllDrives=true${pageToken ? `&pageToken=${pageToken}` : ""}`,
+    );
+    for (const f of r.files) {
+      if (f.mimeType === "application/vnd.google-apps.folder") {
+        if (depth < 4) out.push(...(await driveListFolder(f.id, `${path}${f.name}/`, depth + 1)));
+      } else out.push({ ...f, path: `${path}${f.name}` });
+    }
+    pageToken = r.nextPageToken ?? "";
+  } while (pageToken);
+  return out;
+}
+
+/** Plain text of a Google Doc, Sheet (all tabs as CSV-ish lines) or text file. Other types return null. */
+export async function driveText(f: Pick<DriveFile, "id" | "mimeType">): Promise<string | null> {
+  if (f.mimeType === "application/vnd.google-apps.document") {
+    return gfetch<string>(`https://www.googleapis.com/drive/v3/files/${f.id}/export?mimeType=text/plain&supportsAllDrives=true`);
+  }
+  if (f.mimeType === "application/vnd.google-apps.spreadsheet") {
+    const meta = await gfetch<{ sheets: { properties: { title: string } }[] }>(`https://sheets.googleapis.com/v4/spreadsheets/${f.id}?fields=sheets.properties.title`);
+    const parts: string[] = [];
+    for (const s of meta.sheets.slice(0, 20)) {
+      const v = await gfetch<{ values?: unknown[][] }>(`https://sheets.googleapis.com/v4/spreadsheets/${f.id}/values/${encodeURIComponent(`'${s.properties.title}'!A1:Z2000`)}`);
+      parts.push(`## ${s.properties.title}\n` + (v.values ?? []).map((r) => r.map((c) => String(c ?? "")).join(" | ")).join("\n"));
+    }
+    return parts.join("\n\n");
+  }
+  if (f.mimeType.startsWith("text/")) {
+    return gfetch<string>(`https://www.googleapis.com/drive/v3/files/${f.id}?alt=media&supportsAllDrives=true`);
+  }
+  return null;
+}
+
+/** Create an empty Google Sheet / Doc in a (Shared Drive) folder. */
+export async function driveCreate(name: string, mimeType: "application/vnd.google-apps.spreadsheet" | "application/vnd.google-apps.document", parentId: string) {
+  return gfetch<{ id: string; webViewLink?: string }>(`https://www.googleapis.com/drive/v3/files?supportsAllDrives=true&fields=id,webViewLink`, {
+    method: "POST",
+    body: JSON.stringify({ name, mimeType, parents: [parentId] }),
+  });
+}
+
+/** Overwrite whole tabs of a spreadsheet (creates missing tabs). */
+export async function sheetsWriteTabs(spreadsheetId: string, tabs: { title: string; rows: (string | number | null)[][] }[]) {
+  const meta = await gfetch<{ sheets: { properties: { title: string } }[] }>(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties.title`);
+  const have = new Set(meta.sheets.map((s) => s.properties.title));
+  const add = tabs.filter((t) => !have.has(t.title)).map((t) => ({ addSheet: { properties: { title: t.title } } }));
+  if (add.length) await gfetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`, { method: "POST", body: JSON.stringify({ requests: add }) });
+  await gfetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchClear`, {
+    method: "POST", body: JSON.stringify({ ranges: tabs.map((t) => `'${t.title}'`) }),
+  });
+  await gfetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`, {
+    method: "POST",
+    body: JSON.stringify({ valueInputOption: "RAW", data: tabs.map((t) => ({ range: `'${t.title}'!A1`, values: t.rows.map((r) => r.map((c) => (c === null ? "" : c))) })) }),
+  });
+}
+
+export interface DocParagraph { text: string; style: string }
+
+/** Paragraphs of a Google Doc with their named style (HEADING_1, HEADING_2, NORMAL_TEXT …). */
+export async function docsParagraphs(docId: string): Promise<{ paragraphs: DocParagraph[]; revisionId: string; endIndex: number }> {
+  type El = { endIndex?: number; paragraph?: { paragraphStyle?: { namedStyleType?: string }; elements?: { textRun?: { content?: string } }[] } };
+  const d = await gfetch<{ revisionId: string; body: { content: El[] } }>(`https://docs.googleapis.com/v1/documents/${docId}`);
+  const paragraphs: DocParagraph[] = [];
+  let endIndex = 1;
+  for (const el of d.body.content) {
+    endIndex = Math.max(endIndex, el.endIndex ?? 1);
+    if (!el.paragraph) continue;
+    const text = (el.paragraph.elements ?? []).map((e) => e.textRun?.content ?? "").join("").replace(/\n$/, "");
+    paragraphs.push({ text, style: el.paragraph.paragraphStyle?.namedStyleType ?? "NORMAL_TEXT" });
+  }
+  return { paragraphs, revisionId: d.revisionId, endIndex };
+}
+
+/** Append paragraphs (with heading styles) to the end of a Google Doc. */
+export async function docsAppend(docId: string, blocks: DocParagraph[]) {
+  const { endIndex } = await docsParagraphs(docId);
+  let at = Math.max(1, endIndex - 1);
+  const requests: unknown[] = [];
+  for (const b of blocks) {
+    const text = b.text.replace(/\n+$/, "") + "\n";
+    requests.push({ insertText: { location: { index: at }, text } });
+    requests.push({ updateParagraphStyle: { range: { startIndex: at, endIndex: at + text.length }, paragraphStyle: { namedStyleType: b.style }, fields: "namedStyleType" } });
+    at += text.length;
+  }
+  await gfetch(`https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`, { method: "POST", body: JSON.stringify({ requests }) });
+}

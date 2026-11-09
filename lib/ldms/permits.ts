@@ -179,6 +179,8 @@ export const listPeriods = (permitId: number) =>
 export async function audit(me: Pick<Member, "id" | "name"> | null, action: string, entity: string, entityId: number | string, detail?: string | null) {
   await query(`insert into audit_log (member_id, actor, action, entity, entity_id, detail) values ($1,$2,$3,$4,$5,$6)`,
     [me?.id ?? null, me?.name ?? "Sistem", action, entity, String(entityId), detail ?? null]);
+  // Every audited write is mirrored to the LDMS_DB spreadsheet in Google Drive (after the response).
+  void (await import("../drive")).scheduleMirror();
 }
 
 /* ---------- permissions ---------- */

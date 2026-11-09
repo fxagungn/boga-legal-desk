@@ -95,13 +95,14 @@ export async function logout() {
 
 async function requireLead() {
   const me = await requireMember();
-  if (!["manager", "agm", "admin"].includes(me.role)) throw new Error("Pengaturan hanya bisa diubah Manager, AGM, atau Admin.");
+  const { isSuperAdmin } = await import("@/lib/access");
+  if (!isSuperAdmin(me)) throw new Error("Hanya Super Admin yang bisa mengubah pengaturan ini.");
   return me;
 }
 
 export async function saveMemberAction(_: Result, f: FormData): Promise<Result> {
   return run(async () => {
-    await requireLead();
+    const me = await requireLead();
     const id = str(f, "id");
     const role = str(f, "role");
     if (!isRole(role)) throw new Error("Peran tidak valid");
@@ -115,6 +116,11 @@ export async function saveMemberAction(_: Result, f: FormData): Promise<Result> 
     const birth = str(f, "birth");
     if (id) {
       await query(`update team_members set name=$2, role=$3, email=$4, whatsapp=$5, active=$6, title=$7, nik=$8 where id=$1`, [Number(id), ...vals]);
+      if (f.get("sa_present")) {
+        const sa = f.get("is_super_admin") === "on";
+        if (!sa && Number(id) === me.id) throw new Error("Anda tidak bisa mencabut status Super Admin diri sendiri.");
+        await query(`update team_members set is_super_admin = $2 where id = $1`, [Number(id), sa]);
+      }
     } else {
       if (!nik || !birth) throw new Error("Anggota baru wajib punya NIK dan tanggal lahir (untuk password awal).");
       await query(
@@ -122,7 +128,7 @@ export async function saveMemberAction(_: Result, f: FormData): Promise<Result> 
         [...vals, hashPassword(birthPassword(birth))],
       );
     }
-    revalidatePath("/settings");
+    revalidatePath("/admin");
   });
 }
 
@@ -139,7 +145,7 @@ export async function resetPasswordAction(_: Result, f: FormData): Promise<Resul
       `update team_members set password_hash = $2, must_change_password = true, failed_logins = 0, locked_until = null where id = $1`,
       [id, hashPassword(birthPassword(birth))],
     );
-    revalidatePath("/settings");
+    revalidatePath("/admin");
     return `Password ${m.name} direset ke tanggal lahir`;
   });
 }
@@ -161,12 +167,11 @@ export async function saveSystemAction(_: Result, f: FormData): Promise<Result> 
 
 export async function deleteDemoAction(_?: Result, _f?: FormData): Promise<Result> {
   return run(async () => {
-    await requireLead();
-    // Demo permit registry: permits first (notes/files are keyed by entity), then units that only held demo data.
-    await query(`delete from notes where entity = 'permit' and entity_id in (select id from permits where is_demo)`);
-    await query(`delete from files where entity = 'permit' and entity_id in (select id from permits where is_demo)`);
-    await query(`delete from permits where is_demo`);
-    await query(`delete from units u where u.is_demo and not exists (select 1 from permits p where p.unit_id = u.id)`);
+    const me = await requireLead();
+    const { deleteDemo } = await import("@/lib/ldms/seed2");
+    await deleteDemo({ query: (text: string, params?: unknown[]) => query(text, params ?? []) as Promise<unknown[]> });
+    const { audit } = await import("@/lib/ldms/permits");
+    await audit(me, "hapus data contoh", "admin", "demo", "Semua data contoh dihapus");
     revalidatePath("/", "layout");
   });
 }
@@ -178,7 +183,7 @@ export async function applyEmployeeSyncAction(_?: Result, _f?: FormData): Promis
     const me = await requireLead();
     const { applySync } = await import("@/lib/employees");
     const r = await applySync(me.name);
-    revalidatePath("/settings");
+    revalidatePath("/admin");
     return `Sinkron selesai: ${r.created} akun baru, ${r.linked} ditautkan, ${r.deactivated} dinonaktifkan`;
   });
 }

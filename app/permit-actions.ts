@@ -127,8 +127,13 @@ export async function addNoteAction(_: Result, f: FormData): Promise<Result> {
   return run(async () => {
     const me = await requireMember();
     const entity = str(f, "entity") || "permit";
-    if (!["permit"].includes(entity)) throw new Error("Jenis catatan tidak dikenal.");
+    if (!["permit", "agreement"].includes(entity)) throw new Error("Jenis catatan tidak dikenal.");
     const id = Number(str(f, "id"));
+    if (entity === "permit") {
+      const p = await getPermit(id);
+      if (!p) throw new Error("Dokumen izin tidak ditemukan.");
+      if (!canEditPermit(me, p)) throw new Error(`Hanya PIC (${p.pic_name ?? "—"}) atau Supervisor ke atas yang bisa menambah catatan di izin ini.`);
+    }
     const body = str(f, "body");
     if (!body) throw new Error("Catatan masih kosong.");
     if (body.length > 4000) throw new Error("Catatan terlalu panjang (maks. 4.000 karakter).");

@@ -27,7 +27,7 @@ function raw(): Client {
   return client;
 }
 
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 10;
 
 const MIGRATION = [
   `create table if not exists app_settings (key text primary key, value jsonb not null, updated_at timestamptz not null default now())`,
@@ -182,6 +182,7 @@ export function ensureSchema(): Promise<void> {
       await (await import("./ldms/seed")).seedLdms(q);
       const s2 = await import("./ldms/seed2");
       await s2.seedMatrix(q);
+      await s2.seedOutlets2026(q);
       await s2.seedDemoV2(q);
       await q.query(
         `insert into app_settings (key, value) values ('schema_version', $1::jsonb)

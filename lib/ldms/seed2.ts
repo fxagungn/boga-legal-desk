@@ -7,29 +7,35 @@ import { MATRIX_ROWS, MATRIX_VERSION } from "./matrix-data";
 type Q = { query: (text: string, params?: unknown[]) => Promise<unknown[]> };
 type Scope = "outlet" | "central_kitchen" | "korporat";
 
-/** [code, outlet name, brand, scope, mall, region (as listed), alcohol permit, lift permit] */
-export const DEMO_UNITS_V2: [string, string, string | null, Scope, string | null, string | null, boolean, boolean][] = [
-  ["PL-PS", "Pepper Lunch Plaza Senayan", "Pepper Lunch", "outlet", "Plaza Senayan", "Jabodetabek", false, false],
-  ["PL-GI", "Pepper Lunch Grand Indonesia", "Pepper Lunch", "outlet", "Grand Indonesia", "Jabodetabek", false, false],
-  ["PL-KK", "Pepper Lunch Kota Kasablanka", "Pepper Lunch", "outlet", "Kota Kasablanka", "Jabodetabek", false, false],
-  ["PL-PKW", "Pepper Lunch Pakuwon Mall Surabaya", "Pepper Lunch", "outlet", "Pakuwon Mall", "Surabaya", false, false],
-  ["KM-GI", "Kimukatsu Grand Indonesia", "Kimukatsu", "outlet", "Grand Indonesia", "Jabodetabek", false, false],
-  ["KM-PIM3", "Kimukatsu PIM 3", "Kimukatsu", "outlet", "Pondok Indah Mall 3", "Jabodetabek", false, false],
-  ["KM-CP", "Kimukatsu Central Park", "Kimukatsu", "outlet", "Central Park", "Jabodetabek", false, false],
-  ["KM-TP", "Kimukatsu Tunjungan Plaza", "Kimukatsu", "outlet", "Tunjungan Plaza", "Surabaya", false, false],
-  ["SK-PP", "Shaburi & Kintan Pacific Place", "Shaburi Kintan", "outlet", "Pacific Place", "Jabodetabek", true, false],
-  ["SK-GC", "Shaburi & Kintan Gandaria City", "Shaburi Kintan", "outlet", "Gandaria City", "Jabodetabek", true, false],
-  ["SK-SMS", "Shaburi & Kintan Summarecon Mall Serpong", "Shaburi Kintan", "outlet", "Summarecon Mall Serpong", "Jabodetabek", true, false],
-  ["SK-PKW", "Shaburi & Kintan Pakuwon Mall Surabaya", "Shaburi Kintan", "outlet", "Pakuwon Mall", "Surabaya", true, false],
-  ["YL-GI", "Yakiniku Like Grand Indonesia", "Yakiniku Like", "outlet", "Grand Indonesia", "Jabodetabek", false, false],
-  ["YL-KK", "Yakiniku Like Kota Kasablanka", "Yakiniku Like", "outlet", "Kota Kasablanka", "Jabodetabek", false, false],
-  ["YL-MKG", "Yakiniku Like Mall Kelapa Gading", "Yakiniku Like", "outlet", "Mall Kelapa Gading", "Jabodetabek", false, false],
-  ["PD-PS", "Paradise Dynasty Plaza Senayan", "Paradise Dynasty", "outlet", "Plaza Senayan", "Jabodetabek", true, false],
-  ["PD-CP", "Paradise Dynasty Central Park", "Paradise Dynasty", "outlet", "Central Park", "Jabodetabek", true, false],
-  ["PD-CW", "Paradise Dynasty Ciputra World", "Paradise Dynasty", "outlet", "Ciputra World", "Surabaya", true, true],
-  ["CK", "Central Kitchen", null, "central_kitchen", null, null, false, false],
-  ["HO", "Head Office Boga Group", null, "korporat", null, "Tangerang", false, false],
+/** Outlets used by the demo data — real units from LIST OUTLET 2026: [outlet code, has alcohol permit, has lift permit]. */
+export const DEMO_PICK: [string, boolean, boolean][] = [
+  ["PLPS", false, false], ["PLGI", false, false], ["PLKK", false, false], ["PLPWB", false, false],
+  ["KKGI", false, false], ["KKP3", false, false], ["KKCP", false, false],
+  ["SKSC", true, false], ["SKP3", true, false], ["SKSM", true, false], ["SKCW", true, false],
+  ["YLKK", false, false], ["YLKG", false, false], ["YLGB", false, false],
+  ["PDPS", true, false], ["PDCP", true, true], ["EBMC", false, false], ["HTP5", false, false],
+  ["CHK", false, false], ["HO", false, false],
 ];
+
+/** LIST OUTLET 2026 → brands + units (real master data, not demo). Runs once. */
+export async function seedOutlets2026(q: Q) {
+  const lock = (await q.query(`insert into app_settings (key, value) values ('outlets_2026', 'true'::jsonb) on conflict (key) do nothing returning key`)) as unknown[];
+  if (lock.length === 0) return;
+  const { OUTLETS_2026 } = await import("./outlets-2026");
+  for (const b of new Set(OUTLETS_2026.map((o) => o[1]).filter((x): x is string => !!x))) {
+    await q.query(`insert into brands (name) values ($1) on conflict (name) do nothing`, [b]);
+  }
+  const brandId = new Map(((await q.query(`select id, name from brands`)) as { id: number; name: string }[]).map((b) => [b.name, b.id]));
+  for (const [code, brand, name, mall, scope] of OUTLETS_2026) {
+    await q.query(
+      `insert into units (code, name, brand_id, scope, mall, status, is_demo) values ($1,$2,$3,$4,$5,'aktif',false)
+       on conflict (code) do update set name = excluded.name, brand_id = excluded.brand_id, scope = excluded.scope, mall = coalesce(units.mall, excluded.mall), is_demo = false`,
+      [code, name, brand ? brandId.get(brand) ?? null : null, scope, mall],
+    );
+  }
+  await q.query(`insert into units (code, name, scope, city, status, is_demo) values ('HO','Head Office Boga Group','korporat','Tangerang','aktif',false)
+    on conflict (code) do update set is_demo = false`);
+}
 
 const OUTLET_BASE = ["NIB", "RKL", "HLL", "SLS", "HPJ", "HPM", "LAB", "ULP", "SKP", "NPD", "PHR", "GST", "LIS"];
 
@@ -73,7 +79,7 @@ export async function deleteDemo(q: Q) {
 
 export async function seedDemoV2(q: Q) {
   const lock = (await q.query(
-    `insert into app_settings (key, value) values ('ldms_demo_v2', 'true'::jsonb) on conflict (key) do nothing returning key`,
+    `insert into app_settings (key, value) values ('ldms_demo_v3', 'true'::jsonb) on conflict (key) do nothing returning key`,
   )) as unknown[];
   if (lock.length === 0 || process.env.SEED_DEMO === "false") return;
 
@@ -102,13 +108,13 @@ export async function seedDemoV2(q: Q) {
     return 61 + Math.floor(rand() * 600);
   };
 
+  type U = { id: number; code: string; name: string; brand: string | null; scope: Scope; mall: string | null; city: string | null };
+  const allUnits = (await q.query(`select u.id, u.code, u.name, b.name as brand, u.scope, u.mall, u.city from units u left join brands b on b.id = u.brand_id`)) as U[];
+  const picked = DEMO_PICK.map(([c, alcohol, lift]) => ({ u: allUnits.find((x) => x.code === c), alcohol, lift })).filter((x): x is { u: U; alcohol: boolean; lift: boolean } => !!x.u);
   const unitIds = new Map<string, number>();
-  for (const [code, name, brand, scope, mall, city, alcohol, lift] of DEMO_UNITS_V2) {
-    const u = (await q.query(
-      `insert into units (code, name, brand_id, scope, mall, city, area, is_demo) values ($1,$2,$3,$4,$5,$6,$7,true)
-       on conflict (code) do update set name = excluded.name, mall = excluded.mall, city = excluded.city returning id`,
-      [code, name, brand ? brandId.get(brand) ?? null : null, scope, mall, city, city === "Surabaya" ? "Jawa Timur" : city === "Jabodetabek" ? "Jabodetabek" : null],
-    )) as { id: number }[];
+  for (const { u: unit, alcohol, lift } of picked) {
+    const { code, brand, scope } = unit;
+    const u = [{ id: unit.id }];
     const unitId = u[0].id;
     unitIds.set(code, unitId);
     const codes = scope === "outlet"
@@ -134,8 +140,8 @@ export async function seedDemoV2(q: Q) {
   }
 
   const somasi: [string, string, string][] = [
-    ["PL-GI", "RKL", "Somasi I — pengelola mal: signage tanpa izin reklame berlaku, diminta diturunkan dalam 7 hari."],
-    ["SK-GC", "SLS", "Teguran tertulis Dinas Kesehatan: Sertifikat Laik Sehat belum diperpanjang saat sidak."],
+    ["PLGI", "RKL", "Somasi I — pengelola mal: signage tanpa izin reklame berlaku, diminta diturunkan dalam 7 hari."],
+    ["SKSC", "SLS", "Teguran tertulis Dinas Kesehatan: Sertifikat Laik Sehat belum diperpanjang saat sidak."],
   ];
   for (const [unit, tc, text] of somasi) {
     await q.query(
@@ -146,9 +152,9 @@ export async function seedDemoV2(q: Q) {
     );
   }
   const notes: [string, string, string][] = [
-    ["PL-GI", "RKL", "[Contoh] Sudah koordinasi dengan building management, materi signage baru diajukan ke Dinas PM & PTSP."],
-    ["SK-GC", "SLS", "[Contoh] Peserta pelatihan hygiene sudah didaftarkan untuk batch terdekat."],
-    ["CK", "BTF", "[Contoh] Teknisi PJK3 dijadwalkan riksa uji minggu depan."],
+    ["PLGI", "RKL", "[Contoh] Sudah koordinasi dengan building management, materi signage baru diajukan ke Dinas PM & PTSP."],
+    ["SKSC", "SLS", "[Contoh] Peserta pelatihan hygiene sudah didaftarkan untuk batch terdekat."],
+    ["CHK", "BTF", "[Contoh] Teknisi PJK3 dijadwalkan riksa uji minggu depan."],
   ];
   for (const [unit, tc, body] of notes) {
     await q.query(
@@ -182,7 +188,7 @@ export async function seedDemoV2(q: Q) {
     i++;
   }
   let u = 0;
-  for (const [code, name, brand, scope, mall, city] of DEMO_UNITS_V2) {
+  for (const { u: { code, name, brand, scope, mall, city } } of picked) {
     if (scope !== "outlet" || !brand || !principal[brand]) continue;
     const [, ccy, roy] = principal[brand];
     const d = [520, 210, 74, 900, 31, 640, 155, -12, 380, 47][u % 10];
@@ -210,7 +216,7 @@ export async function seedDemoV2(q: Q) {
     );
   }
   let s = 0;
-  for (const [code, name, , scope, mall, city] of DEMO_UNITS_V2) {
+  for (const { u: { code, name, scope, mall, city } } of picked) {
     if (scope !== "outlet" || !mall) continue;
     const d = [830, 145, 62, 1240, 19, 470, 260, -25, 610, 95][s % 10];
     s++;
@@ -225,18 +231,18 @@ export async function seedDemoV2(q: Q) {
 
   /* ---------- government inspections (contoh) ---------- */
   const ins: [string, number, string, string, string, string, string, string, string, number | null][] = [
-    ["INS-2024-003", -1000, "Disnakertrans", "Pemeriksaan norma K3 — rutin tahunan", "CK", "Temuan minor", "Riksa uji bejana tekan chiller kedaluwarsa 1 bulan; dokumen riksa uji instalasi listrik 170 KVA tidak tersedia saat pemeriksaan.", "Pengajuan riksa uji ulang dalam 14 hari, dokumen K3 dikompilasi dalam satu binder di lokasi.", "Nota pemeriksaan, tanpa denda. Diminta lapor realisasi dalam 30 hari.", null],
-    ["INS-2024-011", -865, "Dinas Kesehatan", "Inspeksi sanitasi & laik sehat", "KM-PIM3", "Temuan mayor", "Sertifikat pelatihan hygiene penjamah makanan habis untuk 3 dari 8 crew; log suhu chiller tidak terisi 4 hari.", "Pendaftaran pelatihan hygiene batch terdekat, penanggung jawab log harian, audit internal 2 minggu sekali.", "Teguran tertulis; laik sehat ditahan sampai bukti pelatihan diserahkan.", null],
-    ["INS-2025-002", -657, "Satpol PP & Bapenda", "Penertiban reklame", "PL-KK", "Sanksi administratif", "Izin reklame lewat masa berlaku 21 hari; signage masih terpasang.", "Pembayaran pajak reklame terutang + denda, pengajuan izin baru, signage diturunkan sementara 5 hari.", "Denda administratif dan signage diturunkan 5 hari.", 4_200_000],
+    ["INS-2024-003", -1000, "Disnakertrans", "Pemeriksaan norma K3 — rutin tahunan", "CHK", "Temuan minor", "Riksa uji bejana tekan chiller kedaluwarsa 1 bulan; dokumen riksa uji instalasi listrik 170 KVA tidak tersedia saat pemeriksaan.", "Pengajuan riksa uji ulang dalam 14 hari, dokumen K3 dikompilasi dalam satu binder di lokasi.", "Nota pemeriksaan, tanpa denda. Diminta lapor realisasi dalam 30 hari.", null],
+    ["INS-2024-011", -865, "Dinas Kesehatan", "Inspeksi sanitasi & laik sehat", "KKP3", "Temuan mayor", "Sertifikat pelatihan hygiene penjamah makanan habis untuk 3 dari 8 crew; log suhu chiller tidak terisi 4 hari.", "Pendaftaran pelatihan hygiene batch terdekat, penanggung jawab log harian, audit internal 2 minggu sekali.", "Teguran tertulis; laik sehat ditahan sampai bukti pelatihan diserahkan.", null],
+    ["INS-2025-002", -657, "Satpol PP & Bapenda", "Penertiban reklame", "PLKK", "Sanksi administratif", "Izin reklame lewat masa berlaku 21 hari; signage masih terpasang.", "Pembayaran pajak reklame terutang + denda, pengajuan izin baru, signage diturunkan sementara 5 hari.", "Denda administratif dan signage diturunkan 5 hari.", 4_200_000],
     ["INS-2025-018", -426, "Disnakertrans — Wasnaker", "Pemeriksaan norma kerja (WLKP & Peraturan Perusahaan)", "HO", "Temuan minor", "WLKP terlapor namun data jumlah karyawan tidak mutakhir; Peraturan Perusahaan tersisa 2 bulan tanpa proses pengesahan ulang.", "Pembaruan WLKP tiap kuartal, pengajuan pengesahan PP 60 hari sebelum berakhir.", "Nota pemeriksaan; bukti pengajuan PP diminta dalam 45 hari.", null],
-    ["INS-2026-004", -206, "BPJPH & LPH", "Surveilan sertifikasi halal", "PL-GI", "Sesuai", "Dokumen SJPH lengkap; 1 bahan baku baru belum masuk daftar bahan disetujui.", "Penambahan bahan ke daftar melalui SIHALAL sebelum digunakan.", "Tidak ada sanksi; catatan surveilan ditutup.", null],
-    ["INS-2026-009", -130, "Disperindag", "Pengawasan peredaran minuman beralkohol", "SK-PKW", "Temuan minor", "SIUP-MB berlaku, namun pencatatan stok dan penjualan MB tidak sesuai format pelaporan triwulan.", "Format pelaporan resmi, pelatihan kasir, rekonsiliasi stok MB bulanan oleh Finance.", "Pembinaan tertulis; wajib lapor triwulan tepat format 1 tahun.", null],
+    ["INS-2026-004", -206, "BPJPH & LPH", "Surveilan sertifikasi halal", "PLGI", "Sesuai", "Dokumen SJPH lengkap; 1 bahan baku baru belum masuk daftar bahan disetujui.", "Penambahan bahan ke daftar melalui SIHALAL sebelum digunakan.", "Tidak ada sanksi; catatan surveilan ditutup.", null],
+    ["INS-2026-009", -130, "Disperindag", "Pengawasan peredaran minuman beralkohol", "SKCW", "Temuan minor", "SIUP-MB berlaku, namun pencatatan stok dan penjualan MB tidak sesuai format pelaporan triwulan.", "Format pelaporan resmi, pelatihan kasir, rekonsiliasi stok MB bulanan oleh Finance.", "Pembinaan tertulis; wajib lapor triwulan tepat format 1 tahun.", null],
   ];
   for (const [code, d, agency, kind, unit, result, findings, follow, cons, fine] of ins) {
     await q.query(
       `insert into inspections (code, insp_date, agency, kind, unit_id, result, findings, follow_up, consequence, fine, pic_id, closed_at, next_expected, is_demo, updated_by)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,true,'Data contoh')`,
-      [code, date(d), agency, kind, unitIds.get(unit) ?? null, result, findings, follow, cons, fine, unit === "HO" || unit === "CK" ? salma : dola, date(d + 30), date(d + 365)],
+      [code, date(d), agency, kind, unitIds.get(unit) ?? null, result, findings, follow, cons, fine, unit === "HO" || unit === "CHK" ? salma : dola, date(d + 30), date(d + 365)],
     );
   }
 
@@ -280,9 +286,9 @@ export async function seedDemoV2(q: Q) {
 
   /* ---------- punishments (contoh: one per stage) ---------- */
   const pn: [string, string, string, string, string, string, string, string, string | null][] = [
-    ["PNS-2026-001", "Outlet Manager", "PL-PS", "KS-04", "1st Occurrence", "ST", "SP1", "[Contoh] Crew merokok di area loading di luar jam istirahat; dilaporkan SPV shift, foto tersedia.", "legal"],
-    ["PNS-2026-002", "Area Manager", "KM-GI", "PT-05-A", "1st Occurrence", "SP1", "SP1", "[Contoh] Kegagalan pengawasan pencatatan suhu chiller selama 3 hari; tidak ada produk tersaji bermasalah.", "hr"],
-    ["PNS-2026-003", "Internal Audit", "SK-SMS", "FK-03", "1st Occurrence", "SP1", "SP2", "[Contoh] ID card diskon karyawan dipakai untuk transaksi pelanggan umum sebanyak 6 bill.", "done"],
+    ["PNS-2026-001", "Outlet Manager", "PLPS", "KS-04", "1st Occurrence", "ST", "SP1", "[Contoh] Crew merokok di area loading di luar jam istirahat; dilaporkan SPV shift, foto tersedia.", "legal"],
+    ["PNS-2026-002", "Area Manager", "KKGI", "PT-05-A", "1st Occurrence", "SP1", "SP1", "[Contoh] Kegagalan pengawasan pencatatan suhu chiller selama 3 hari; tidak ada produk tersaji bermasalah.", "hr"],
+    ["PNS-2026-003", "Internal Audit", "SKSM", "FK-03", "1st Occurrence", "SP1", "SP2", "[Contoh] ID card diskon karyawan dipakai untuk transaksi pelanggan umum sebanyak 6 bill.", "done"],
   ];
   for (const [code, fn, unit, mcode, occ, std, prop, desc, status] of pn) {
     const rule = ((await q.query(`select appeal, authority from matrix_rules where code = $1`, [mcode])) as { appeal: string; authority: string }[])[0];

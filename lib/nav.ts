@@ -13,7 +13,6 @@ export interface NavItem {
 export const NAV: { label: string; items: NavItem[] }[] = [
   { label: "Ringkasan", items: [
     { href: "/", label: "Dashboard", title: "Dashboard Compliance", sub: "Registry aktif · outlet · Head Office · Central Kitchen", module: "dashboard" },
-    { href: "/tanya", label: "Tanya LDMS", title: "Tanya LDMS", sub: "Tanya apa saja soal perizinan, agreement, sanksi, preseden, dan pemeriksaan", module: "chat" },
   ] },
   { label: "Permit", items: [
     { href: "/perizinan", label: "Registry Perizinan", title: "Registry Permit & License", sub: "Master list izin Legal — ambang renewal berbeda per jenis", module: "permit" },

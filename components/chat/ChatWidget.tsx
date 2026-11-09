@@ -1,7 +1,6 @@
 "use client";
 import { Fragment, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { Loader2, MessageCircle, RotateCcw, Send, Sparkles, X } from "lucide-react";
 import { cx } from "@/components/ui";
 
@@ -41,7 +40,6 @@ function Rich({ text }: { text: string }) {
 
 /** Floating "Tanya LDMS" chat, bottom-right on every page. */
 export function ChatWidget({ name, inline = false }: { name: string; inline?: boolean }) {
-  const path = usePathname();
   const [open, setOpen] = useState(inline);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -97,7 +95,6 @@ export function ChatWidget({ name, inline = false }: { name: string; inline?: bo
     setMsgs([]);
   }
 
-  if (!inline && path === "/tanya") return null;
 
   const panel = (
     <div className={cx("flex flex-col overflow-hidden bg-surface", inline ? "card h-[calc(100dvh-170px)] min-h-[480px]" : "fixed right-4 bottom-[148px] z-50 h-[min(620px,calc(100dvh-170px))] w-[min(400px,calc(100vw-32px))] rounded-2xl border border-line shadow-[var(--shadow-float)] md:right-6 md:bottom-24 md:h-[min(620px,calc(100dvh-120px))]")}

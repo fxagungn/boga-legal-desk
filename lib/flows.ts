@@ -15,11 +15,13 @@ export interface Flows {
     /** Extra reminder points for agreements, on top of the notice threshold (blueprint §6.3). */
     agreementStages: number[];
   };
-  punishment: {
-    /** HR Business Partner approvers (email). They approve through a signed link, without an LDMS account. */
-    hrApprovers: string[];
-    /** Submitter functions shown on the form (blueprint §7.2). */
-    submitterFunctions: string[];
+  sigap: {
+    /** URL of the SIGAP system, shown embedded in Data Record › SIGAP. */
+    url: string;
+    /** Open in a new tab instead of embedding (for systems that block iframes). */
+    newTab: boolean;
+    /** Violation categories offered when recording a SIGAP result. */
+    categories: string[];
   };
   ai: {
     enabled: boolean;
@@ -37,10 +39,7 @@ export interface Flows {
 
 export const DEFAULT_FLOWS: Flows = {
   reminder: { sendEnabled: false, supervisorId: null, corpSupervisorId: null, headId: null, directorId: null, digestEnabled: true, agreementStages: [60, 30, 7] },
-  punishment: {
-    hrApprovers: [],
-    submitterFunctions: ["Area Manager", "Outlet Manager", "MOD / SPV Shift", "Head Chef", "Brand Leader", "Internal Audit", "Whistleblowing System", "QA Manager", "Legal"],
-  },
+  sigap: { url: "", newTab: false, categories: ["Kepatuhan SOP", "Fraud & kriminal", "Keamanan pangan", "Produktivitas & tanggung jawab", "Perilaku & etika", "K3"] },
   ai: { enabled: true, model: "claude-sonnet-5-5" },
   drive: { folderUrl: "", folderId: "", dbSheetId: "", kbDocId: "", mirrorEnabled: true },
 };
@@ -49,7 +48,7 @@ export async function getFlows(): Promise<Flows> {
   const v = (await getKV<Partial<Flows>>("flows")) ?? {};
   return {
     reminder: { ...DEFAULT_FLOWS.reminder, ...(v.reminder ?? {}) },
-    punishment: { ...DEFAULT_FLOWS.punishment, ...(v.punishment ?? {}) },
+    sigap: { ...DEFAULT_FLOWS.sigap, ...(v.sigap ?? {}) },
     ai: { ...DEFAULT_FLOWS.ai, ...(v.ai ?? {}) },
     drive: { ...DEFAULT_FLOWS.drive, ...(v.drive ?? {}) },
   };
@@ -59,7 +58,7 @@ export async function saveFlows(patch: { [K in keyof Flows]?: Partial<Flows[K]> 
   const cur = await getFlows();
   const next: Flows = {
     reminder: { ...cur.reminder, ...(patch.reminder ?? {}) },
-    punishment: { ...cur.punishment, ...(patch.punishment ?? {}) },
+    sigap: { ...cur.sigap, ...(patch.sigap ?? {}) },
     ai: { ...cur.ai, ...(patch.ai ?? {}) },
     drive: { ...cur.drive, ...(patch.drive ?? {}) },
   };

@@ -1,8 +1,5 @@
-// Schema v9 seed: the 72-row Summary Matrix (master data) and demo data v2.
-// Demo v2 replaces the earlier demo outlets with outlets that exist in Boga Group's public outlet list
-// (Bank Mega partner list "Partners Boga Group – UPDATE"); mall and region are copied as written there.
-// Everything demo is flagged is_demo and can be removed from Admin Console → Sistem.
-import { MATRIX_ROWS, MATRIX_VERSION } from "./matrix-data";
+// Master outlets (LIST OUTLET 2026) and demo data v4. Demo rows sit on real Boga Group outlets; numbers, dates,
+// counterparties and case facts are illustrative and marked "[Contoh]" / is_demo. Admin Console → Sistem removes them all.
 
 type Q = { query: (text: string, params?: unknown[]) => Promise<unknown[]> };
 type Scope = "outlet" | "central_kitchen" | "korporat";
@@ -48,25 +45,18 @@ function rng(seed: number) {
   };
 }
 
-export async function seedMatrix(q: Q) {
-  for (const [i, [code, cat, sub, a, b, c, appeal, auth]] of MATRIX_ROWS.entries()) {
-    await q.query(
-      `insert into matrix_rules (code, category, sub_category, s_1st, s_repeat, s_severe, appeal, authority, version, sort)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) on conflict (code) do nothing`,
-      [code, cat, sub, a, b, c, appeal, auth, MATRIX_VERSION, i + 1],
-    );
-  }
-}
-
 /** Remove every demo row (permits, units, agreements, cases …). Real data is never touched. */
 export async function deleteDemo(q: Q) {
-  for (const [entity, table] of [["permit", "permits"], ["agreement", "agreements"], ["punishment", "punishments"], ["inspection", "inspections"], ["library", "library"]]) {
+  for (const [entity, table] of [["permit", "permits"], ["agreement", "agreements"], ["inspection", "inspections"], ["library", "library"], ["case", "cases"], ["sigap", "sigap_results"]]) {
     await q.query(`delete from notes where entity = $1 and entity_id in (select id from ${table} where is_demo)`, [entity]);
     await q.query(`delete from files where entity = $1 and entity_id in (select id from ${table} where is_demo)`, [entity]);
     await q.query(`delete from reminders where entity = $1 and entity_id in (select id from ${table} where is_demo)`, [entity]);
     await q.query(`delete from audit_log where entity = $1 and entity_id in (select id::text from ${table} where is_demo)`, [entity]);
   }
   await q.query(`delete from punishments where is_demo`);
+  await q.query(`delete from kb_cases where is_demo or case_id in (select id from cases where is_demo) or sigap_id in (select id from sigap_results where is_demo)`);
+  await q.query(`delete from cases where is_demo`);
+  await q.query(`delete from sigap_results where is_demo`);
   await q.query(`delete from agreements where is_demo and kind = 'ULA'`);
   await q.query(`delete from agreements where is_demo`);
   await q.query(`delete from permits where is_demo`);
@@ -74,12 +64,13 @@ export async function deleteDemo(q: Q) {
   await q.query(`delete from library where is_demo`);
   await q.query(`delete from kb_cases where is_demo`);
   await q.query(`delete from units u where u.is_demo and not exists (select 1 from permits p where p.unit_id = u.id)
-     and not exists (select 1 from agreements a where a.unit_id = u.id) and not exists (select 1 from inspections i where i.unit_id = u.id)`);
+     and not exists (select 1 from agreements a where a.unit_id = u.id) and not exists (select 1 from inspections i where i.unit_id = u.id)
+     and not exists (select 1 from cases c where c.unit_id = u.id) and not exists (select 1 from sigap_results s where s.unit_id = u.id)`);
 }
 
 export async function seedDemoV2(q: Q) {
   const lock = (await q.query(
-    `insert into app_settings (key, value) values ('ldms_demo_v3', 'true'::jsonb) on conflict (key) do nothing returning key`,
+    `insert into app_settings (key, value) values ('ldms_demo_v4', 'true'::jsonb) on conflict (key) do nothing returning key`,
   )) as unknown[];
   if (lock.length === 0 || process.env.SEED_DEMO === "false") return;
 
@@ -166,7 +157,7 @@ export async function seedDemoV2(q: Q) {
     );
   }
 
-  /* ---------- agreements (MLA per principal brand, ULA per outlet of that brand, PKS, PSM per outlet) ---------- */
+  /* ---------- agreements (MLA per principal brand, ULA per outlet of that brand, PKS) ---------- */
   const date = (d: number) => iso(addDays(d));
   const principal: Record<string, [string, string, number, number]> = {
     // brand: [principal (blueprint §6.1), currency, royalty % (contoh), notice days (contoh)]
@@ -215,20 +206,6 @@ export async function seedDemoV2(q: Q) {
       [`PKS-${String(k + 1).padStart(3, "0")}`, title, cp, nature, value, term, date(d - 365), date(d), salma],
     );
   }
-  let s = 0;
-  for (const { u: { code, name, scope, mall, city } } of picked) {
-    if (scope !== "outlet" || !mall) continue;
-    const d = [830, 145, 62, 1240, 19, 470, 260, -25, 610, 95][s % 10];
-    s++;
-    await q.query(
-      `insert into agreements (code, kind, unit_id, title, counterparty, location, city, scheme, currency, value, tenor, renewal_option, start_date, end_date, notice_days, pic_id, is_demo, updated_by)
-       values ($1,'PSM',$2,$3,$4,$5,$6,$7,'IDR',$8,'5 tahun','Opsi perpanjangan 5 tahun',$9,$10,180,$11,true,'Data contoh')`,
-      [`PSM-${String(s).padStart(3, "0")}`, unitIds.get(code), `Sewa menyewa — ${name}`, `Pengelola ${mall}`, mall, city,
-        s % 3 === 0 ? "Fixed rent + service charge" : `Fixed vs revenue sharing ${8 + (s % 4)}%`, (140 + Math.floor(rand() * 190)) * 1_000_000,
-        date(d - 1825), date(d), virgy],
-    );
-  }
-
   /* ---------- government inspections (contoh) ---------- */
   const ins: [string, number, string, string, string, string, string, string, string, number | null][] = [
     ["INS-2024-003", -1000, "Disnakertrans", "Pemeriksaan norma K3 — rutin tahunan", "CHK", "Temuan minor", "Riksa uji bejana tekan chiller kedaluwarsa 1 bulan; dokumen riksa uji instalasi listrik 170 KVA tidak tersedia saat pemeriksaan.", "Pengajuan riksa uji ulang dalam 14 hari, dokumen K3 dikompilasi dalam satu binder di lokasi.", "Nota pemeriksaan, tanpa denda. Diminta lapor realisasi dalam 30 hari.", null],
@@ -246,17 +223,13 @@ export async function seedDemoV2(q: Q) {
     );
   }
 
-  /* ---------- library (contoh) ---------- */
+  /* ---------- repository: legal opinions & memos (contoh) ---------- */
   const lib: [string, string, number, string, string, string, string][] = [
-    ["LIB-PSM-014", "PSM", -970, "Sewa menyewa — mal tier-1 Jakarta, skema revenue sharing", "Pengelola Grand Indonesia · 5 tahun", "Sewa dasar dengan revenue sharing 9% di atas threshold; kenaikan service charge maksimal 7% per tahun.", "Berhasil menegosiasikan cap kenaikan service charge 7%/tahun dan fit-out period 60 hari bebas sewa. Klausul relokasi wajib disertai kompensasi fit-out."],
-    ["LIB-PSM-021", "PSM", -735, "Sewa menyewa — mal tier-2, fixed rent murni", "Pengelola Botani Square Bogor · 5 tahun", "Fixed rent tanpa revenue sharing; kenaikan 5% per 2 tahun.", "Tanpa cap service charge — menjadi pelajaran; tahun kedua service charge naik 14% dan tidak bisa ditolak."],
-    ["LIB-PKS-008", "PKS", -657, "Kerja sama supply daging slice", "[Contoh] Pemasok daging · 1 tahun", "Harga terkunci 6 bulan pertama, penyesuaian maksimal 8% dengan notifikasi 30 hari.", "Reject rate >2% memberi hak pemotongan pembayaran; wajib sertifikat halal berlaku sepanjang kontrak."],
-    ["LIB-PKS-012", "PKS", -510, "Kerja sama jasa kebersihan multi-outlet", "[Contoh] Vendor jasa kebersihan · 2 tahun", "SLA kehadiran 98%, penalti 0,5% nilai bulanan per pelanggaran SLA, notice termination 60 hari.", "Klausul no-poaching dua arah dan kewajiban vendor menanggung BPJS pekerjanya dengan bukti bulanan."],
-    ["LIB-LA-004", "License", -436, "Amandemen MLA — penyesuaian royalty & minimum unit", "Principal Jepang · amandemen ke-2", "Royalty tetap, kewajiban pembukaan minimum unit diturunkan dari 5 menjadi 3 unit/tahun.", "Argumen yang berhasil: data okupansi mal dan biaya perizinan per unit yang meningkat."],
-    ["LIB-LA-007", "License", -271, "ULA outlet baru — negosiasi unit fee & radius", "Principal Jepang · outlet baru", "Unit fee dengan proteksi radius 3 km dari outlet existing; tenor 5 tahun mengikuti MLA induk.", "Radius protection didapat setelah menunjukkan kanibalisasi penjualan outlet terdekat; unit fee dibayar 50/50."],
-    ["LIB-LO-002", "Legal Opinion", -539, "Tanggung jawab perizinan pada outlet di dalam mal", "Diminta Ops Director", "Izin reklame dan laik sehat tetap kewajiban penyewa meski mal memiliki izin induk.", "Cantumkan pembagian kewajiban perizinan secara eksplisit di PSM untuk menghindari sengketa biaya dengan pengelola mal."],
-    ["LIB-LO-005", "Legal Opinion", -397, "Konsekuensi operasional saat izin laik sehat kedaluwarsa", "Diminta Legal Manager", "Operasional tanpa sertifikat laik sehat berlaku memberi dasar penghentian sementara oleh Dinkes.", "Ambang pengajuan renewal H-60 karena jadwal pelatihan hygiene Dinkes sering menjadi bottleneck."],
-    ["LIB-LO-009", "Legal Opinion", -230, "Batas kewenangan sanksi oleh atasan langsung", "Diminta HR", "Surat Teguran dapat diterbitkan atas usulan atasan langsung; SP1–SP3 wajib persetujuan Legal dan HR.", "Seluruh pengajuan sanksi dicatat dalam satu sistem dengan jejak approval."],
+    ["LIB-LO-002", "Legal Opinion", -539, "Tanggung jawab perizinan pada outlet di dalam mal", "Diminta Ops Director", "Izin reklame dan laik sehat tetap kewajiban penyewa meski mal memiliki izin induk.", "Cantumkan pembagian kewajiban perizinan secara eksplisit di perjanjian dengan pengelola mal untuk menghindari sengketa biaya."],
+    ["LIB-LO-005", "Legal Opinion", -397, "Konsekuensi operasional saat izin laik sehat kedaluwarsa", "Diminta Legal Manager", "Operasional tanpa sertifikat laik sehat berlaku memberi dasar penghentian sementara oleh Dinas Kesehatan.", "Ambang pengajuan renewal H-60 karena jadwal pelatihan hygiene Dinkes sering menjadi bottleneck."],
+    ["LIB-LO-009", "Legal Opinion", -230, "Pelaporan pidana atas penggelapan oleh pihak ketiga", "Diminta Finance Controller", "Penggelapan setoran oleh pihak ketiga memenuhi unsur Pasal 372 KUHP bila penguasaan barang sah sejak awal; bukti utama: tanda terima setoran dan rekonsiliasi bank.", "Amankan bukti dalam 3x24 jam, buat Berita Acara internal sebelum laporan polisi, dan tunjuk satu PIC Legal sebagai penghubung penyidik."],
+    ["LIB-LO-012", "Legal Opinion", -142, "Penanganan komplain konsumen yang viral di media sosial", "Diminta Corporate Communication", "Respons publik tidak boleh memuat pengakuan tanggung jawab sebelum investigasi QA selesai; kompensasi diberikan sebagai itikad baik.", "Kesepakatan damai memuat klausul kerahasiaan dan non-disparagement; libatkan Legal sebelum unggahan klarifikasi."],
+    ["LIB-MM-003", "Memo hukum", -96, "Batas PHK karena pelanggaran dan dokumentasi pembinaan", "Untuk HR Business Partner", "PHK atas pelanggaran mendesak tetap memerlukan dokumentasi pembinaan dan kesempatan pembelaan diri.", "Setiap SP wajib ada tanda terima atau Berita Acara penolakan; arsip di SIGAP."],
     ["LIB-RES-003", "Resume", -117, "Pola temuan pemeriksaan Disnakertrans 3 tahun terakhir", "Untuk rapat Ops & Legal", "Temuan berulang pada riksa uji peralatan Central Kitchen dan kemutakhiran data WLKP.", "Jadwalkan riksa uji serentak per semester dan perbarui WLKP setiap kuartal."],
   ];
   for (const [code, kind, d, title, parties, core, points] of lib) {
@@ -266,39 +239,126 @@ export async function seedDemoV2(q: Q) {
     );
   }
 
-  /* ---------- knowledge base (contoh; no names, functions only) ---------- */
-  const kb: [string, number, string, string, string, string, string, string, string, string, string, string, string, string][] = [
-    ["YRS-2024-011", -965, "Void bill tanpa otorisasi & selisih setoran kas", "Kimukatsu Grand Indonesia", "Kimukatsu", "FK-06-D", "Fraud & Kriminal", "Area kasir, shift sore", "Fungsi kasir (disaksikan SPV shift)", "Legal Manager + HR Business Partner", "SP3 PHK", "Void bill 14 kali setelah pembayaran tunai diterima; selisih setoran dalam 3 minggu.", "Temuan dari rekonsiliasi POS vs setoran, dikonfirmasi CCTV, pengakuan tercatat dalam BAP.", "Rekonsiliasi POS vs setoran kas 3 minggu → rekaman CCTV kasir jam void → pencocokan timestamp → klarifikasi tertulis → BAP dengan saksi SPV shift → perhitungan kerugian final oleh Finance.|Unsur kesengajaan dan pengulangan sistematis, kerugian finansial langsung, pengakuan dalam BAP. FK-06-D 1st → SP3 PHK sesuai matrix."],
-    ["YRS-2024-027", -785, "Penggunaan bahan melewati masa simpan", "Pepper Lunch Plaza Senayan", "Pepper Lunch", "QA-01", "Temuan Audit QA", "Kitchen — chiller station", "Fungsi crew kitchen & SPV shift", "Legal Officer + QA Manager", "ST", "Audit QA menemukan item tanpa label tanggal dan 1 item melewati shelf life 2 hari.", "Audit rutin QA, tidak ada komplain pelanggan, produk belum tersaji.", "Audit QA dengan checklist FIFO → foto item → log suhu chiller 7 hari → klarifikasi crew dan SPV → verifikasi produk belum tersaji → rekomendasi QA Manager.|Tidak ada dampak ke pelanggan dan tidak ada kesengajaan, namun temuan major kedua dalam 6 bulan → QA-01 Repeat → ST sesuai matrix."],
-    ["YRS-2025-021", -508, "Merokok di area belakang dapur", "Paradise Dynasty Plaza Senayan", "Paradise Dynasty", "KS-04", "Kepatuhan SOP & kebijakan perusahaan", "Area belakang dekat gudang kering", "Fungsi crew kitchen", "Legal Officer", "ST", "Merokok di luar smoking area; tidak ada kerusakan material.", "Dilaporkan rekan kerja, dikonfirmasi SPV, diakui dalam klarifikasi.", "Laporan rekan kerja → konfirmasi SPV → dokumentasi → klarifikasi tertulis → penilaian risiko kebakaran bersama tim K3.|1st Occurrence KS-04 → ST sesuai matrix."],
-    ["YRS-2025-029", -458, "Merokok berulang, memicu alarm asap", "Kimukatsu Central Park", "Kimukatsu", "KS-04", "Kepatuhan SOP & kebijakan perusahaan", "Gudang kering", "Fungsi crew kitchen", "Legal Manager + Ops Manager", "SP1", "Merokok di area terlarang memicu alarm asap dan evakuasi sebagian area mal.", "Alarm aktif, evakuasi 20 menit, teguran dari pengelola mal.", "Waktu alarm & durasi evakuasi → CCTV gudang → koordinasi pengelola mal → klarifikasi tertulis → pemeriksaan pelanggaran sejenis.|Repeat KS-04 → SP1 sesuai matrix; dampak ke pihak ketiga dicatat sebagai faktor memberatkan pembuktian."],
-    ["YRS-2025-041", -342, "Diskon karyawan dipakai untuk transaksi pihak luar", "Pepper Lunch Kota Kasablanka", "Pepper Lunch", "FK-03", "Fraud & Kriminal", "Kasir", "Fungsi crew service", "Legal Manager + Finance Controller", "SP1", "Employee discount dipakai untuk 22 transaksi pelanggan umum.", "Terdeteksi dari anomali laporan diskon POS; tidak ada bukti penerimaan uang tambahan.", "Anomali laporan diskon POS → tarik 22 bill → cocokkan pemegang → klarifikasi → verifikasi mutasi/QRIS → kerugian margin oleh Finance.|1st Occurrence FK-03 → SP1 sesuai matrix."],
-    ["YRS-2026-006", -240, "Izin reklame kedaluwarsa, outlet ditegur pengelola mal", "Pepper Lunch Kota Kasablanka", "Pepper Lunch", "PT-04-A", "Produktivitas & Tanggung Jawab", "Fasad outlet", "Fungsi PIC dokumen", "Legal Manager", "SP1", "Izin reklame lewat masa berlaku 21 hari; pengelola mal meminta penurunan signage.", "Reminder H-30 terkirim namun tidak ditindaklanjuti.", "Verifikasi registry → jejak reminder → konfirmasi teguran mal → klarifikasi PIC → status renewal di instansi.|Kelalaian berdampak minor → PT-04-A 1st → SP1."],
+  /* ---------- cases (contoh; functions only, no employee names) ---------- */
+  type Step = [number, string, string, string];
+  type Doc = [string, string, number];
+  type C = {
+    code: string; cat: string; title: string; unit: string; inc: number; rep: number; reporter: string; cp: string; forum: string; risk: string; exposure: number | null;
+    chrono: string; rcc: string; rc: string; status: string; steps: Step[]; docs: Doc[];
+    close?: { decision: string; outcome: string; settlement: number | null; lesson: string; preventive: string };
+  };
+  const cases: C[] = [
+    {
+      code: "CASE-2025-004", cat: "Konsumen & regulator", title: "Keluhan dugaan keracunan makanan yang viral di media sosial", unit: "PLGI", inc: -410, rep: -409,
+      reporter: "Customer Service", cp: "[Contoh] Pelanggan pengadu", forum: "Mediasi", risk: "Tinggi", exposure: 50_000_000,
+      chrono: "Pelanggan mengunggah keluhan sakit perut setelah makan di outlet; unggahan dibagikan ulang ±4.000 kali dalam 24 jam. Pelanggan meminta ganti rugi dan mengancam melapor ke Dinas Kesehatan.",
+      rcc: "Keamanan pangan / kualitas produk", rc: "Holding time saus melewati batas SOP 4 jam saat jam ramai; tidak ada label waktu pada wadah.", status: "selesai",
+      steps: [[-409, "Laporan diterima", "Customer Service", "Keluhan dicatat, pelanggan dihubungi dalam 2 jam"], [-408, "Investigasi & pengumpulan bukti", "QA Manager & Legal Officer", "Audit dapur, log suhu dan holding time ditarik, sampel diuji di laboratorium terakreditasi"],
+        [-405, "Berita Acara", "Legal Officer", "BA klarifikasi dengan pelanggan dan BA hasil audit QA ditandatangani"], [-400, "Negosiasi / mediasi", "Legal Manager", "Pertemuan dengan pelanggan; penggantian biaya pengobatan sebagai itikad baik"],
+        [-396, "Keputusan", "Legal Manager & Corporate Communication", "Kesepakatan damai disetujui; klarifikasi publik bersama"]],
+      docs: [["Berita Acara", "BA klarifikasi pelanggan", -405], ["Bukti", "Hasil uji laboratorium sampel", -403], ["Kesepakatan", "Surat kesepakatan damai", -396]],
+      close: { decision: "Penggantian biaya pengobatan dan voucher; kesepakatan damai dengan klausul kerahasiaan dan non-disparagement.", outcome: "Damai / settlement", settlement: 7_500_000,
+        lesson: "Respons 1x24 jam dengan alur QA → Legal → Corcom mencegah eskalasi ke regulator. Holding time wajib dilabel.", preventive: "Label waktu pada wadah saus, audit holding time mingguan oleh QA." },
+    },
+    {
+      code: "CASE-2025-011", cat: "Ketenagakerjaan", title: "Perselisihan PHK karyawan — mediasi Disnaker", unit: "KKP3", inc: -330, rep: -322,
+      reporter: "HR Business Partner", cp: "[Contoh] Mantan karyawan", forum: "PHI / Disnaker", risk: "Sedang", exposure: 64_000_000,
+      chrono: "Karyawan di-PHK setelah SP3 karena ketidakhadiran berulang. Karyawan menggugat ke Disnaker dengan dalil SP1 dan SP2 tidak pernah diterima.",
+      rcc: "SOP tidak dijalankan", rc: "SP1 dan SP2 tidak memiliki tanda terima atau Berita Acara penolakan.", status: "selesai",
+      steps: [[-322, "Laporan diterima", "HR Business Partner", "Panggilan mediasi Disnaker diterima"], [-318, "Investigasi & pengumpulan bukti", "Legal Officer", "Arsip SP, absensi, dan payroll dikumpulkan"],
+        [-300, "Negosiasi / mediasi", "Legal Manager & HR Business Partner", "Dua kali sidang mediasi di Disnaker"], [-286, "Keputusan", "Legal Manager", "Perjanjian Bersama disepakati dan didaftarkan ke PHI"]],
+      docs: [["Somasi / surat", "Surat panggilan mediasi Disnaker", -322], ["Kesepakatan", "Perjanjian Bersama (didaftarkan PHI)", -286]],
+      close: { decision: "Perjanjian Bersama: kompensasi sesuai PP 35/2021 tanpa pengakuan PHK cacat prosedur.", outcome: "Damai / settlement", settlement: 38_500_000,
+        lesson: "Dokumentasi pembinaan menentukan posisi tawar. SP tanpa tanda terima melemahkan posisi perusahaan di mediasi.", preventive: "Setiap SP dicatat di SIGAP dengan tanda terima / BA penolakan." },
+    },
+    {
+      code: "CASE-2025-018", cat: "Sengketa komersial", title: "Wanprestasi vendor POS — maintenance terlambat", unit: "HO", inc: -250, rep: -246,
+      reporter: "IT Manager", cp: "[Contoh] Vendor sistem POS", forum: "Somasi / negosiasi", risk: "Sedang", exposure: 120_000_000,
+      chrono: "Gangguan POS di 9 outlet tidak ditangani dalam SLA 4 jam selama 3 minggu; transaksi manual menimbulkan selisih kas.",
+      rcc: "Kontrak / dokumen lemah", rc: "PKS tidak memuat service credit; satu-satunya remedi adalah terminasi.", status: "selesai",
+      steps: [[-246, "Laporan diterima", "IT Manager", "Log tiket gangguan diserahkan ke Legal"], [-240, "Berita Acara", "Legal Officer", "BA keterlambatan SLA ditandatangani IT dan vendor"],
+        [-235, "Eskalasi", "Legal Manager", "Somasi I dikirim ke vendor"], [-220, "Negosiasi / mediasi", "Legal Manager & Procurement", "Negosiasi kompensasi dan amandemen PKS"], [-210, "Keputusan", "Head of Legal", "Amandemen PKS disetujui"]],
+      docs: [["Berita Acara", "BA keterlambatan SLA", -240], ["Somasi / surat", "Somasi I kepada vendor POS", -235], ["Kesepakatan", "Amandemen PKS dengan service credit", -210]],
+      close: { decision: "Kompensasi berupa potongan biaya maintenance 3 bulan dan amandemen PKS dengan service credit 5% per pelanggaran SLA.", outcome: "Damai / settlement", settlement: 45_000_000,
+        lesson: "PKS jasa kritikal wajib memuat service credit, bukan hanya hak terminasi.", preventive: "Template PKS jasa diperbarui dengan klausul service credit." },
+    },
+    {
+      code: "CASE-2026-002", cat: "Pidana / laporan polisi", title: "Penggelapan setoran tunai oleh kurir pihak ketiga", unit: "SKSC", inc: -120, rep: -115,
+      reporter: "Finance Controller", cp: "[Contoh] Kurir jasa pengantaran setoran", forum: "Kepolisian", risk: "Tinggi", exposure: 48_600_000,
+      chrono: "Tiga setoran tunai tidak masuk ke rekening perusahaan; kurir pihak ketiga tidak dapat dihubungi setelah tanggal setoran terakhir.",
+      rcc: "Kontrol internal lemah", rc: "Setoran tunai diserahkan tanpa dual control dan tanpa verifikasi bank harian.", status: "proses",
+      steps: [[-115, "Laporan diterima", "Finance Controller", "Selisih rekonsiliasi bank dilaporkan ke Legal"], [-113, "Investigasi & pengumpulan bukti", "Legal Officer & Internal Audit", "Tanda terima setoran, CCTV, dan mutasi rekening dikumpulkan"],
+        [-110, "Berita Acara", "Legal Officer", "BA pemeriksaan internal dengan saksi Outlet Manager"], [-108, "Proses hukum", "Legal Manager", "Laporan polisi dibuat; penyidik meminta keterangan saksi"]],
+      docs: [["Berita Acara", "BA pemeriksaan internal", -110], ["Laporan polisi", "Tanda bukti lapor", -108], ["Bukti", "Rekonsiliasi bank & tanda terima setoran", -112]],
+    },
+    {
+      code: "CASE-2026-005", cat: "Sengketa komersial", title: "Sengketa kenaikan service charge dengan pengelola mal", unit: "YLKK", inc: -75, rep: -70,
+      reporter: "Business Development", cp: "[Contoh] Pengelola mal", forum: "Somasi / negosiasi", risk: "Sedang", exposure: 186_000_000,
+      chrono: "Pengelola mal menaikkan service charge 18% dan menagih denda keterlambatan atas selisih yang ditolak outlet.",
+      rcc: "Kontrak / dokumen lemah", rc: "Perjanjian sewa tidak memuat batas kenaikan service charge.", status: "proses",
+      steps: [[-70, "Laporan diterima", "Business Development", "Tagihan dan surat pengelola diteruskan ke Legal"], [-64, "Investigasi & pengumpulan bukti", "Legal Officer", "Perbandingan kenaikan service charge di mal sejenis"],
+        [-50, "Negosiasi / mediasi", "Legal Manager & Business Development", "Pertemuan pertama dengan pengelola mal"]],
+      docs: [["Somasi / surat", "Surat tagihan & denda pengelola mal", -70]],
+    },
+    {
+      code: "CASE-2026-009", cat: "Ketenagakerjaan", title: "Kecelakaan kerja crew dapur — luka bakar", unit: "CHK", inc: -21, rep: -21,
+      reporter: "HSE Officer", cp: "—", forum: "Regulator / instansi", risk: "Sedang", exposure: null,
+      chrono: "Crew dapur mengalami luka bakar tingkat II saat memindahkan panci kaldu. Dilaporkan sebagai kecelakaan kerja ke BPJS Ketenagakerjaan.",
+      rcc: "SOP tidak dijalankan", rc: "APD (sarung tangan tahan panas) tidak dipakai; troli angkut sedang rusak.", status: "investigasi",
+      steps: [[-21, "Laporan diterima", "HSE Officer", "Pertolongan pertama dan rujukan ke rumah sakit"], [-20, "Investigasi & pengumpulan bukti", "HSE Officer & Legal Officer", "Investigasi kecelakaan dan laporan tahap I ke BPJS Ketenagakerjaan"]],
+      docs: [["Berita Acara", "BA kecelakaan kerja", -20]],
+    },
   ];
-  for (const [code, d, title, unit, brand, mcode, cat, loc, fn, dec, sanc, sum, chrono, rest] of kb) {
-    const [inv, reason] = rest.split("|");
-    await q.query(
-      `insert into kb_cases (code, case_date, title, unit_label, brand, matrix_code, category, location, functions, decider, sanction, summary, chronology, investigation, reasoning, source, is_demo)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'demo',true)`,
-      [code, date(d), title, unit, brand, mcode, cat, loc, fn, dec, sanc, sum, chrono, inv, reason],
-    );
+  const caseIds = new Map<string, number>();
+  for (const c of cases) {
+    const r = (await q.query(
+      `insert into cases (code, category, title, unit_id, incident_date, reported_date, reporter, counterparty, forum, risk, exposure, chronology, root_cause_cat, root_cause,
+         pic_id, status, decision, outcome, settlement, closed_at, lesson, preventive, is_demo, updated_by)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,true,'Data contoh') returning id`,
+      [c.code, c.cat, c.title, unitIds.get(c.unit) ?? allUnits.find((u) => u.code === c.unit)?.id ?? null, date(c.inc), date(c.rep), c.reporter, c.cp, c.forum, c.risk, c.exposure,
+        c.chrono, c.rcc, c.rc, c.cat === "Ketenagakerjaan" ? jala ?? salma : c.cat === "Sengketa komersial" ? virgy ?? salma : dola ?? salma, c.status,
+        c.close?.decision ?? null, c.close?.outcome ?? null, c.close?.settlement ?? null, c.close ? date(c.steps[c.steps.length - 1][0]) : null, c.close?.lesson ?? null, c.close?.preventive ?? null],
+    )) as { id: number }[];
+    const id = r[0].id;
+    caseIds.set(c.code, id);
+    for (const [d, stage, handler, action] of c.steps) {
+      await q.query(`insert into case_steps (case_id, step_date, stage, handler, action, by_name) values ($1,$2,$3,$4,$5,'Data contoh')`, [id, date(d), stage, handler, action]);
+    }
+    if (c.close) await q.query(`insert into case_steps (case_id, step_date, stage, handler, action, by_name) values ($1,$2,'Penutupan','Legal Manager',$3,'Data contoh')`, [id, date(c.steps[c.steps.length - 1][0]), `Ditutup: ${c.close.outcome}`]);
+    for (const [kind, label, d] of c.docs) {
+      await q.query(`insert into case_docs (case_id, kind, label, doc_date, by_name) values ($1,$2,$3,$4,'Data contoh')`, [id, kind, `[Contoh] ${label}`, date(d)]);
+    }
   }
+  // Closed cases → Knowledge Base (same mapping as publishCaseToKb, done in SQL because the app's query() is not ready during seeding).
+  await q.query(
+    `insert into kb_cases (code, case_date, title, unit_label, brand, category, location, chronology, investigation, decider, sanction, reasoning, root_cause, outcome, lesson, case_id, source, is_demo)
+     select 'KB-' || c.code, c.closed_at, c.title, u.name, b.name, c.category, c.forum, c.chronology,
+       (select string_agg(s.stage || ' — ' || s.handler, ' → ' order by s.step_date, s.id) from case_steps s where s.case_id = c.id),
+       (select string_agg(s.handler, ', ') from case_steps s where s.case_id = c.id and s.stage = 'Keputusan'),
+       c.decision, c.preventive, concat_ws(' — ', c.root_cause_cat, c.root_cause), c.outcome, c.lesson, c.id, 'case', true
+     from cases c left join units u on u.id = c.unit_id left join brands b on b.id = u.brand_id
+     where c.is_demo and c.status = 'selesai' on conflict (code) do nothing`,
+  );
+  await q.query(`update cases set kb_code = 'KB-' || code where is_demo and status = 'selesai'`);
 
-  /* ---------- punishments (contoh: one per stage) ---------- */
-  const pn: [string, string, string, string, string, string, string, string, string | null][] = [
-    ["PNS-2026-001", "Outlet Manager", "PLPS", "KS-04", "1st Occurrence", "ST", "SP1", "[Contoh] Crew merokok di area loading di luar jam istirahat; dilaporkan SPV shift, foto tersedia.", "legal"],
-    ["PNS-2026-002", "Area Manager", "KKGI", "PT-05-A", "1st Occurrence", "SP1", "SP1", "[Contoh] Kegagalan pengawasan pencatatan suhu chiller selama 3 hari; tidak ada produk tersaji bermasalah.", "hr"],
-    ["PNS-2026-003", "Internal Audit", "SKSM", "FK-03", "1st Occurrence", "SP1", "SP2", "[Contoh] ID card diskon karyawan dipakai untuk transaksi pelanggan umum sebanyak 6 bill.", "done"],
+  /* ---------- SIGAP results (contoh) ---------- */
+  const sg: [string, number, string, string, string, string, string, string][] = [
+    ["SGP-2026-001", -160, "PDPS", "Kepatuhan SOP", "Merokok di area belakang dapur", "Surat Teguran", "Smoking area tidak tersedia di jalur belakang outlet", "Koordinasi dengan pengelola mal untuk smoking area karyawan; sosialisasi ulang SOP."],
+    ["SGP-2026-004", -95, "PLKK", "Fraud & kriminal", "Diskon karyawan dipakai untuk transaksi pelanggan umum", "SP1", "Kartu diskon karyawan tidak divalidasi di POS", "Validasi NIK di POS untuk setiap diskon karyawan; audit anomali diskon bulanan."],
+    ["SGP-2026-007", -40, "KKGI", "Keamanan pangan", "Log suhu chiller tidak diisi 3 hari", "Surat Teguran", "Penanggung jawab log tidak ditetapkan per shift", "Tetapkan PIC log suhu per shift dan cek oleh MOD saat closing."],
   ];
-  for (const [code, fn, unit, mcode, occ, std, prop, desc, status] of pn) {
-    const rule = ((await q.query(`select appeal, authority from matrix_rules where code = $1`, [mcode])) as { appeal: string; authority: string }[])[0];
+  for (const [code, d, unit, cat, violation, decision, rc, lesson] of sg) {
+    const r = (await q.query(
+      `insert into sigap_results (code, ref, result_date, unit_id, category, violation, decision, root_cause, lesson, is_demo, updated_by)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,'Data contoh') returning id`,
+      [code, `[Contoh] ${code.replace("SGP", "SIGAP")}`, date(d), allUnits.find((u) => u.code === unit)?.id ?? null, cat, violation, decision, rc, lesson],
+    )) as { id: number }[];
     await q.query(
-      `insert into punishments (code, submitter_fn, submitted_by, unit_id, matrix_code, occurrence, matrix_std, proposed, description, status,
-         final, legal_by, legal_at, hr_by, hr_at, appeal, authority, is_demo)
-       values ($1,$2,'Data contoh',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,true)`,
-      [code, fn, unitIds.get(unit), mcode, occ, std, prop, desc, status,
-        status === "legal" ? null : std, status === "legal" ? null : "Jala Yuan", status === "legal" ? null : new Date(Date.now() - 2 * 86_400_000),
-        status === "done" ? "HR Business Partner" : null, status === "done" ? new Date(Date.now() - 86_400_000) : null, rule?.appeal ?? null, rule?.authority ?? null],
+      `insert into kb_cases (code, case_date, title, unit_label, brand, category, summary, sanction, root_cause, lesson, outcome, sigap_id, source, is_demo)
+       select 'KB-' || s.code, s.result_date, s.violation, u.name, b.name, 'SIGAP · ' || s.category, s.violation, s.decision, s.root_cause, s.lesson, 'Sanksi internal', s.id, 'sigap', true
+       from sigap_results s left join units u on u.id = s.unit_id left join brands b on b.id = u.brand_id where s.id = $1 on conflict (code) do nothing`,
+      [r[0].id],
     );
+    await q.query(`update sigap_results set kb_code = 'KB-' || code where id = $1`, [r[0].id]);
   }
 }

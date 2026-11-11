@@ -72,17 +72,17 @@ export function ActionForm({ action, children, className, success, onDone, reset
 }
 
 /** Button that opens a small dialog containing an action form. */
-export function ActionDialog({ action, id, trigger, triggerClass = "btn", title, desc, children, submit, submitClass = "btn btn-primary", success }: {
+export function ActionDialog({ action, id, trigger, triggerClass = "btn", title, desc, children, submit, submitClass = "btn btn-primary", success, wide }: {
   action: Act; id: number; trigger: React.ReactNode; triggerClass?: string; title: string; desc?: string;
-  children?: React.ReactNode; submit: string; submitClass?: string; success?: string;
+  children?: React.ReactNode; submit: string; submitClass?: string; success?: string; wide?: boolean;
 }) {
   const dlg = useRef<HTMLDialogElement>(null);
   const [key, setKey] = useState(0);
   return (
     <>
       <button type="button" className={triggerClass} onClick={() => { setKey((k) => k + 1); dlg.current?.showModal(); }}>{trigger}</button>
-      <dialog ref={dlg} className="m-auto w-[min(440px,calc(100vw-32px))] rounded-2xl border border-line bg-surface p-0 text-ink shadow-[var(--shadow-float)]" onClick={(e) => { if (e.target === dlg.current) dlg.current?.close(); }}>
-        <ActionForm key={key} action={action} success={success} onDone={() => dlg.current?.close()} className="p-5">
+      <dialog ref={dlg} className={`m-auto ${wide ? "w-[min(680px,calc(100vw-32px))]" : "w-[min(440px,calc(100vw-32px))]"} rounded-2xl border border-line bg-surface p-0 text-ink shadow-[var(--shadow-float)]`} onClick={(e) => { if (e.target === dlg.current) dlg.current?.close(); }}>
+        <ActionForm key={key} action={action} success={success} onDone={() => dlg.current?.close()} className="max-h-[calc(100dvh-48px)] overflow-y-auto p-5">
           <input type="hidden" name="id" value={id} />
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>

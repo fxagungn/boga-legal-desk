@@ -2,6 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { DEFAULT_WORKFLOWS, type Workflows } from "./workflow";
 import { LDMS_MIGRATION } from "./ldms/schema";
 import { LDMS_MIGRATION_V9 } from "./ldms/schema2";
+import { LDMS_MIGRATION_V11 } from "./ldms/schema3";
 
 export const hasDb = () => Boolean(dbUrl());
 const dbUrl = () => process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.DATABASE_URL_UNPOOLED || "";
@@ -27,7 +28,7 @@ function raw(): Client {
   return client;
 }
 
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 11;
 
 const MIGRATION = [
   `create table if not exists app_settings (key text primary key, value jsonb not null, updated_at timestamptz not null default now())`,
@@ -162,6 +163,8 @@ const MIGRATION = [
   ...LDMS_MIGRATION,
   // v9: agreements, matrix & punishment, KB, inspections, library, AI log, chat, Drive index, super admin
   ...LDMS_MIGRATION_V9,
+  // v11: Cases, SIGAP, employee cache for access cohorts, KB from cases
+  ...LDMS_MIGRATION_V11,
 ];
 
 let ready: Promise<void> | null = null;
@@ -181,7 +184,6 @@ export function ensureSchema(): Promise<void> {
       await applyTeamRoster();
       await (await import("./ldms/seed")).seedLdms(q);
       const s2 = await import("./ldms/seed2");
-      await s2.seedMatrix(q);
       await s2.seedOutlets2026(q);
       await s2.seedDemoV2(q);
       await q.query(

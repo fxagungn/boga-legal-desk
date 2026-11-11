@@ -8,7 +8,7 @@ import { ROLE_LABEL } from "@/lib/workflow";
 import { logout } from "@/app/actions";
 import { initials } from "@/lib/format";
 import { NAV_ITEMS } from "@/lib/nav";
-import { can, getAccess, isSuperAdmin } from "@/lib/access";
+import { can, getAccessCtx, isSuperAdmin } from "@/lib/access";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 
 export const dynamic = "force-dynamic";
@@ -19,13 +19,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (me.must_change_password) redirect("/ganti-password");
   const settings = await getSettings();
   // Sidebar badge: my permits that need action (in renewal window, or somasi not yet acknowledged).
-  const [mine, total] = await Promise.all([query<{ n: number }>(
+  const access = await getAccessCtx();
+  const permitOk = can(access, me, "permit", "view");
+  const [mine, total] = !permitOk ? [[], []] : await Promise.all([query<{ n: number }>(
     `select count(*)::int as n from permits p join permit_types t on t.id = p.permit_type_id join units u on u.id = p.unit_id
      where u.status = 'aktif' and p.pic_id = $1 and ((p.expiry_date - (now() at time zone 'Asia/Jakarta')::date) <= t.lead_days or (p.requires_ack and p.ack_at is null))`,
     [me.id],
   ), query<{ n: number }>(`select count(*)::int as n from permits p join units u on u.id = p.unit_id where u.status = 'aktif'`)]);
-  const badges = { "/perizinan": { n: mine[0]?.n || total[0]?.n || 0, hot: Boolean(mine[0]?.n) } };
-  const access = await getAccess();
+  void total;
+  const badges = { "/perizinan": { n: mine[0]?.n || 0, hot: true } };
   const superAdmin = isSuperAdmin(me);
   const allowed = NAV_ITEMS.filter((i) => (i.superAdmin ? superAdmin : !i.module || can(access, me, i.module, "view"))).map((i) => i.href);
   const chatOk = can(access, me, "chat", "view");
@@ -85,12 +87,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             {settings.uatMode && (
               <p className="flex flex-1 items-center gap-2 rounded-xl border border-info/20 bg-info-bg px-4 py-2.5 text-[13.5px] text-info">
                 <FlaskConical size={16} className="shrink-0" />
-                <span><b>Mode UAT.</b> Data uji coba; notifikasi {settings.uatRecipient ? <>hanya dikirim ke {settings.uatRecipient}</> : "tidak dikirim"}.</span>
+                <span><b>Mode UAT.</b> Notifikasi {settings.uatRecipient ? <>hanya ke {settings.uatRecipient}</> : "tidak dikirim"}.</span>
               </p>
             )}
             {settings.maintenance && (
               <p className="flex flex-1 items-center gap-2 rounded-xl border border-warn/20 bg-warn-bg px-4 py-2.5 text-[13.5px] text-warn">
-                <Wrench size={16} className="shrink-0" /><span><b>Maintenance aktif.</b> Hanya Manager, AGM, dan Admin yang bisa masuk.</span>
+                <Wrench size={16} className="shrink-0" /><span><b>Maintenance aktif.</b></span>
               </p>
             )}
           </div>

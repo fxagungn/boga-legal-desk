@@ -16,15 +16,18 @@ export interface Member {
   has_password?: boolean;
   last_login_at?: string | Date | null;
   is_super_admin?: boolean;
+  grade?: string | null;
+  dept?: string | null;
+  division?: string | null;
 }
 
 export async function listMembers(activeOnly = false) {
-  return query<Member>(`select id, name, role, email, whatsapp, active, title, nik, must_change_password, password_hash is not null as has_password, last_login_at, is_super_admin from team_members ${activeOnly ? "where active" : ""} order by
-    case role when 'staff' then 1 when 'supervisor' then 2 when 'manager' then 3 when 'agm' then 4 when 'cpo' then 5 else 6 end, name`);
+  return query<Member>(`select id, name, role, email, whatsapp, active, title, nik, must_change_password, password_hash is not null as has_password, last_login_at, is_super_admin, grade, dept, division from team_members ${activeOnly ? "where active and role <> 'viewer'" : ""} order by
+    case role when 'staff' then 1 when 'supervisor' then 2 when 'manager' then 3 when 'agm' then 4 when 'cpo' then 5 when 'admin' then 6 else 7 end, name`);
 }
 
 export async function getMember(id: number) {
-  return one<Member>(`select id, name, role, email, whatsapp, active, title, nik, must_change_password, password_hash is not null as has_password, last_login_at, is_super_admin from team_members where id = $1`, [id]);
+  return one<Member>(`select id, name, role, email, whatsapp, active, title, nik, must_change_password, password_hash is not null as has_password, last_login_at, is_super_admin, grade, dept, division from team_members where id = $1`, [id]);
 }
 
 /** The currently signed-in member, or null. */

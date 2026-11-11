@@ -45,7 +45,8 @@ export async function login(_: unknown, f: FormData) {
     [nik],
   );
   const wrong = { error: "NIK atau password salah." };
-  if (!m || !m.active) return wrong;
+  if (!m) return firstLoginFromCohort(nik, password, str(f, "next"));
+  if (!m.active) return wrong;
   if (m.locked_until && new Date(m.locked_until) > new Date()) {
     const mins = Math.ceil((+new Date(m.locked_until) - Date.now()) / 60000);
     return { error: `Terlalu banyak percobaan. Coba lagi dalam ${mins} menit, atau minta Manager Legal me-reset password.` };
@@ -59,6 +60,8 @@ export async function login(_: unknown, f: FormData) {
     );
     return tries >= MAX_TRIES ? { error: `Akun dikunci ${LOCK_MINUTES} menit karena terlalu banyak percobaan.` } : { error: `NIK atau password salah. Sisa ${MAX_TRIES - tries} percobaan.` };
   }
+  const noAccess = await viewerWithoutAccess(m.id);
+  if (noAccess) return { error: noAccess };
   await query(`update team_members set failed_logins = 0, locked_until = null, last_login_at = now() where id = $1`, [m.id]);
   const jar = await cookies();
   // Until the initial password is changed the session lasts only for this browser session.
@@ -66,6 +69,42 @@ export async function login(_: unknown, f: FormData) {
   const next = str(f, "next");
   const dest = next.startsWith("/") && !next.startsWith("//") ? next : "/";
   redirect(m.must_change_password ? `/ganti-password?next=${encodeURIComponent(dest)}` : dest);
+}
+
+/** A non-Legal employee whose cohorts grant no module cannot sign in. */
+async function viewerWithoutAccess(id: number): Promise<string | null> {
+  const p = await one<{ role: string; nik: string | null; title: string | null; grade: string | null; dept: string | null; division: string | null }>(
+    `select role, nik, title, grade, dept, division from team_members where id = $1`, [id]);
+  if (!p || p.role !== "viewer") return null;
+  const { cohortModules, getCohorts } = await import("@/lib/access");
+  return cohortModules(await getCohorts(), p).size ? null : "Akun Anda belum diberi akses modul LDMS. Hubungi Admin Legal.";
+}
+
+/**
+ * First sign-in of an employee outside the Legal team: allowed when the HR sheet lists them as active and an access
+ * cohort covers them. The password is their birth date (DDMMYYYY), read live from the sheet; they must change it.
+ */
+async function firstLoginFromCohort(nik: string, password: string, next: string) {
+  const wrong = { error: "NIK atau password salah." };
+  const emp = await one<{ nik: string; name: string; title: string | null; grade: string | null; dept: string | null; division: string | null; email: string | null }>(
+    `select nik, name, title, grade, dept, division, email from employees where nik = $1 and active`, [nik]);
+  if (!emp) return wrong;
+  const { cohortModules, getCohorts } = await import("@/lib/access");
+  if (cohortModules(await getCohorts(), emp).size === 0) return { error: "NIK Anda belum diberi akses LDMS. Hubungi Admin Legal." };
+  const { employeeBirth } = await import("@/lib/employees");
+  let birth: string | null = null;
+  try { birth = await employeeBirth(nik); } catch { return { error: "Data karyawan sedang tidak bisa dibaca. Coba lagi beberapa saat." }; }
+  if (!birth || password !== birthPassword(birth)) return wrong;
+  const row = await one<{ id: number }>(
+    `insert into team_members (name, role, title, email, nik, grade, dept, division, password_hash, must_change_password, active, last_login_at)
+     values ($1,'viewer',$2,$3,$4,$5,$6,$7,$8,true,true,now()) on conflict do nothing returning id`,
+    [emp.name, emp.title, emp.email, emp.nik, emp.grade, emp.dept, emp.division, hashPassword(password)],
+  );
+  if (!row) return wrong;
+  await query(`insert into audit_log (actor, action, entity, entity_id, detail) values ($1,'akun cohort dibuat','team',$2,'login pertama karyawan non-Legal')`, [emp.name, emp.nik]);
+  (await cookies()).set(SESSION_COOKIE, await signSession(row.id), COOKIE_OPTS);
+  const dest = next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  redirect(`/ganti-password?next=${encodeURIComponent(dest)}`);
 }
 
 export async function changePasswordAction(_: unknown, f: FormData) {

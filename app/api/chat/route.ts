@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { stepCountIs, streamText, type ModelMessage } from "ai";
 import { query } from "@/lib/db";
 import { currentMember } from "@/lib/repo";
-import { can, getAccess } from "@/lib/access";
+import { can, getAccessCtx } from "@/lib/access";
 import { aiModel, aiReady, logAi } from "@/lib/ai";
 import { CHAT_SYSTEM, ldmsTools } from "@/lib/chat-tools";
 import { formatDate } from "@/lib/time";
@@ -12,7 +12,8 @@ export const maxDuration = 60;
 async function me() {
   const m = await currentMember();
   if (!m || m.must_change_password) return null;
-  return can(await getAccess(), m, "chat", "view") ? m : null;
+  const a = await getAccessCtx();
+  return can(a, m, "chat", "view") ? Object.assign(m, { canView: (mod: Parameters<typeof can>[2]) => can(a, m, mod, "view") }) : null;
 }
 
 /** History for the floating chat (last 40 messages). */
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
     model: aiModel(ready.model),
     system: CHAT_SYSTEM(m.name, formatDate(Date.now())),
     messages,
-    tools: ldmsTools(),
+    tools: ldmsTools(m.canView),
     stopWhen: stepCountIs(6),
     maxOutputTokens: 1200,
     onToolExecutionEnd: ({ toolCall }) => { used.push(toolCall.toolName); },

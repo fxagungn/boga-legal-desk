@@ -1,19 +1,18 @@
-// MLA · ULA · PKS · PSM (blueprint §6).
+// MLA · ULA · PKS (Data Record). PSM was retired; old PSM rows stay in the table but are not shown.
 import { query } from "../db";
 
 export type AgrKind = "MLA" | "ULA" | "PKS" | "PSM";
-export const AGR_KINDS: AgrKind[] = ["MLA", "ULA", "PKS", "PSM"];
-export const AGR_LABEL: Record<AgrKind, string> = {
-  MLA: "MLA (Master)", ULA: "ULA (per outlet)", PKS: "PKS (Kerja Sama)", PSM: "PSM (Sewa Menyewa)",
-};
+export const AGR_KINDS: AgrKind[] = ["MLA", "ULA", "PKS"];
+export const AGR_LABEL: Record<AgrKind, string> = { MLA: "MLA", ULA: "ULA", PKS: "PKS", PSM: "PSM" };
 export const AGR_LONG: Record<AgrKind, string> = {
   MLA: "Master License Agreement", ULA: "Unit License Agreement", PKS: "Perjanjian Kerja Sama", PSM: "Perjanjian Sewa Menyewa",
 };
+/** One-line rule, shown as a tooltip on the tab. */
 export const AGR_RULE: Record<AgrKind, string> = {
-  MLA: "Satu MLA per brand berprincipal — hanya Kimukatsu, Shaburi Kintan, dan Yakiniku Like. Brand milik sendiri tidak memiliki MLA maupun ULA. Notifikasi pada ambang notice renewal di perjanjian, bukan pada tanggal berakhir.",
-  ULA: "Satu ULA per outlet brand berprincipal; jumlah ULA aktif harus sama dengan jumlah outlet aktif brand itu. ULA menunjuk MLA induk dan tidak boleh berakhir melewatinya. Nilai dalam USD/SGD.",
-  PKS: "Perjanjian vendor / jasa / supply korporat dalam Rupiah. Perhatikan termination clause dan notice period.",
-  PSM: "Satu PSM per outlet dengan pengelola mal sebagai lessor. Perhatikan skema sewa, service charge, dan opsi perpanjangan.",
+  MLA: "Satu MLA per brand berprincipal. Reminder mengikuti ambang notice di perjanjian.",
+  ULA: "Satu ULA per outlet brand berprincipal; tidak boleh berakhir melewati MLA induk.",
+  PKS: "Perjanjian vendor / jasa / supply. Perhatikan termination clause dan notice period.",
+  PSM: "",
 };
 
 export interface AgreementRow {
@@ -37,9 +36,9 @@ const COLS = `a.id, a.code, a.kind, a.parent_id, p.code as parent_code, to_char(
 const FROM = `from agreements a left join agreements p on p.id = a.parent_id left join brands b on b.id = a.brand_id
   left join units u on u.id = a.unit_id left join team_members m on m.id = a.pic_id`;
 
-export const listAgreements = () => query<AgreementRow>(`select ${COLS} ${FROM} order by a.kind, a.end_date nulls last, a.code`);
+export const listAgreements = () => query<AgreementRow>(`select ${COLS} ${FROM} where a.kind <> 'PSM' order by a.kind, a.end_date nulls last, a.code`);
 export const getAgreementByCode = async (code: string) =>
-  (await query<AgreementRow>(`select ${COLS} ${FROM} where upper(a.code) = upper($1)`, [code]))[0] ?? null;
+  (await query<AgreementRow>(`select ${COLS} ${FROM} where upper(a.code) = upper($1) and a.kind <> 'PSM'`, [code]))[0] ?? null;
 
 /** Chip for agreements (§6.3): lewat merah solid · ≤60 merah muda · ≤180 amber · aman abu-hijau. */
 export function agrChip(days: number | null): { text: string; cls: string } {

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { one, query } from "@/lib/db";
 import { requireMember, type Member } from "@/lib/repo";
+import { requireCan } from "@/lib/access";
 import {
   audit, canEditPermit, canManageSomasi, getPermit, nextPermitCode, RENEWAL_LABEL, RENEWAL_STEPS,
   type PermitRow, type RenewalStatus,
@@ -31,6 +32,7 @@ async function run(fn: () => Promise<void | string>): Promise<Result> {
 
 async function loadEditable(f: FormData): Promise<{ me: Member; p: PermitRow }> {
   const me = await requireMember();
+  await requireCan(me, "permit", "edit");
   const p = await getPermit(Number(str(f, "id")));
   if (!p) throw new Error("Dokumen izin tidak ditemukan.");
   if (!canEditPermit(me, p)) throw new Error(`Hanya PIC (${p.pic_name ?? "—"}) atau Supervisor ke atas yang bisa mengubah izin ini.`);
@@ -82,6 +84,7 @@ export async function issuePermitAction(_: Result, f: FormData): Promise<Result>
 export async function markSomasiAction(_: Result, f: FormData): Promise<Result> {
   return run(async () => {
     const me = await requireMember();
+    await requireCan(me, "permit", "approve");
     if (!canManageSomasi(me)) throw new Error("Menandai somasi hanya untuk Supervisor ke atas.");
     const p = await getPermit(Number(str(f, "id")));
     if (!p) throw new Error("Dokumen izin tidak ditemukan.");
@@ -101,6 +104,7 @@ export async function markSomasiAction(_: Result, f: FormData): Promise<Result> 
 export async function clearSomasiAction(_: Result, f: FormData): Promise<Result> {
   return run(async () => {
     const me = await requireMember();
+    await requireCan(me, "permit", "approve");
     if (!canManageSomasi(me)) throw new Error("Mencabut somasi hanya untuk Supervisor ke atas.");
     const id = Number(str(f, "id"));
     await query(`update permits set requires_ack = false, somasi_text = null, somasi_at = null, somasi_by = null, ack_by = null, ack_at = null, ack_via = null where id = $1`, [id]);
@@ -128,6 +132,7 @@ export async function addNoteAction(_: Result, f: FormData): Promise<Result> {
     const me = await requireMember();
     const entity = str(f, "entity") || "permit";
     if (!["permit", "agreement"].includes(entity)) throw new Error("Jenis catatan tidak dikenal.");
+    await requireCan(me, entity === "permit" ? "permit" : "agreement", "edit");
     const id = Number(str(f, "id"));
     if (entity === "permit") {
       const p = await getPermit(id);
@@ -172,6 +177,7 @@ export async function uploadFileAction(_: Result, f: FormData): Promise<Result> 
 export async function savePermitAction(_: Result, f: FormData): Promise<Result> {
   return run(async () => {
     const me = await requireMember();
+    await requireCan(me, "permit", "edit");
     const id = Number(str(f, "id")) || 0;
     const fields = {
       unit_id: Number(str(f, "unit_id")) || null,

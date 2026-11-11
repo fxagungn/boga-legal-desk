@@ -255,3 +255,12 @@ Tiap fase: commit ke branch ini → Vercel preview → user cek → lanjut.
 | `SUPER_ADMIN_NIK` | (opsional) NIK Super Admin awal; tanpa ini akun peran Admin = Super Admin |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Sinkron karyawan + repository Google Drive |
 | `RESEND_API_KEY`, `RESEND_FROM` | (nanti) kirim email reminder; sampai diisi Reminder Engine berjalan sebagai simulasi |
+
+## v11 — 3 kategori modul, Cases, SIGAP, cohort akses
+
+- **Navigasi:** Dashboard · Data Record (Permit & License, MLA·ULA·PKS, Government Inspection, Cases, SIGAP) · Repository (Legal Opinion, Berkas Case) · Knowledge Base (Insight & Pelajaran) · Admin Console (Reminder, Audit, Akses & pengaturan, Akun).
+- **Dihapus:** PSM, Terapkan Matrix (AI), Matrix Disiplin, Pengajuan & Approval sanksi (diganti SIGAP), halaman HR approval.
+- **Cases:** kategori dapat diatur Admin (default: sengketa komersial, pidana, konsumen & regulator, ketenagakerjaan); kronologi, root cause, forum, eksposur, alur penanganan (tahap → penangan → tindakan), berkas (BA/bukti/putusan → Repository), keputusan + hasil + pelajaran. Tutup case → entri KB otomatis (KB-CASE-…), juga ditulis ke Google Docs KB.
+- **SIGAP:** rumah modul (embed URL dari Admin Console › Alur & SIGAP) + rekap hasil → KB (KB-SGP-…). Integrasi API menyusul.
+- **Akses:** matrix per peran Tim Legal + cohort karyawan (grade, departemen/brand, kata jabatan, daftar NIK). Karyawan non-Legal login pertama dengan NIK + tanggal lahir dari sheet HR (dibaca langsung, tidak disimpan) bila cocok dengan cohort; akun dibuat dengan peran `viewer`.
+- **Tampilan:** kartu diganti daftar ringkas; detail di panel samping; subjudul dan paragraf penjelasan dihapus.

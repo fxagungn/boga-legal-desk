@@ -82,13 +82,12 @@ export async function NotesSection({ entity, id, editable, placeholder, title = 
 
 export function Kpi({ label, value, unit, sub, tone, dot }: { label: string; value: React.ReactNode; unit?: string; sub?: string; tone?: string; dot?: string }) {
   return (
-    <div className="card p-5">
+    <div className="card p-4 md:p-5" title={sub}>
       <div className="flex items-center gap-2 text-[11.5px] font-bold tracking-[0.6px] text-ink-2 uppercase">{dot && <span className={cx("h-2 w-2 rounded-full", dot)} aria-hidden="true" />}{label}</div>
       <div className="mt-2.5 flex items-baseline gap-1.5">
         <span className={cx("font-mono text-[28px] leading-none font-semibold tracking-[-1px]", tone ?? "text-ink")}>{value}</span>
         {unit && <span className="text-[12px] font-medium text-ink-3">{unit}</span>}
       </div>
-      {sub && <p className="mt-2.5 text-[12px] leading-relaxed text-ink-3">{sub}</p>}
     </div>
   );
 }

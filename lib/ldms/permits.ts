@@ -186,9 +186,9 @@ export async function audit(me: Pick<Member, "id" | "name"> | null, action: stri
 /* ---------- permissions ---------- */
 
 /** Staff edit only the permits they hold; everyone else in Legal can edit all. */
-export const canEditPermit = (me: Member, p: Pick<PermitRow, "pic_id">) => me.role !== "staff" || p.pic_id === me.id;
+export const canEditPermit = (me: Member, p: Pick<PermitRow, "pic_id">) => !["staff", "viewer"].includes(me.role) || p.pic_id === me.id;
 /** Raising / lifting a somasi is a supervisor-level decision. */
-export const canManageSomasi = (me: Member) => me.role !== "staff";
+export const canManageSomasi = (me: Member) => !["staff", "viewer"].includes(me.role);
 
 /** "J Dola Sinulingga" → "J Dola", "Destika Nurhayati" → "Destika". */
 export const shortName = (n?: string | null) => {

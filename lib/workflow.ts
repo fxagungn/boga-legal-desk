@@ -1,7 +1,7 @@
 // Approval flows per document type. Defaults live here; the team edits them in Pengaturan
 // (stored in app_settings.app.workflows). Every function takes the active `Workflows`.
 
-export type Role = "staff" | "supervisor" | "manager" | "agm" | "cpo" | "admin";
+export type Role = "staff" | "supervisor" | "manager" | "agm" | "cpo" | "admin" | "viewer";
 export type DocType = string;
 export type DocStatus = "active" | "on_hold" | "done" | "cancelled";
 export type RiskLevel = "low" | "medium" | "high";
@@ -43,10 +43,11 @@ export const ROLE_LABEL: Record<Role, string> = {
   agm: "AGM Legal",
   cpo: "CPLO",
   admin: "Admin",
+  viewer: "Karyawan (non-Legal)",
 };
 
 /** Who an overdue item escalates to. */
-export const ESCALATION: Record<Role, Role | null> = { staff: "supervisor", supervisor: "manager", manager: "agm", agm: "cpo", cpo: null, admin: null };
+export const ESCALATION: Record<Role, Role | null> = { staff: "supervisor", supervisor: "manager", manager: "agm", agm: "cpo", cpo: null, admin: null, viewer: null };
 
 export const STATUS_LABEL: Record<DocStatus, string> = {
   active: "Berjalan",

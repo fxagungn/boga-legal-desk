@@ -5,7 +5,7 @@ import { formatDateTime } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
-const ENTITY_LABEL: Record<string, string> = { permit: "Perizinan", agreement: "Perjanjian", punishment: "Sanksi", inspection: "Pemeriksaan", library: "Library", kb: "Knowledge Base", reminder: "Reminder", letter: "Surat", ai_run: "AI", admin: "Admin", member: "Tim" };
+const ENTITY_LABEL: Record<string, string> = { permit: "Permit", agreement: "Perjanjian", inspection: "Pemeriksaan", case: "Cases", sigap: "SIGAP", library: "Repository", kb: "Knowledge Base", reminder: "Reminder", ai_run: "AI", admin: "Admin", team: "Tim" };
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ q?: string; e?: string; p?: string }> }) {
   await pageGuard("audit");

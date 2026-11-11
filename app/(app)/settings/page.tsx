@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { KeyRound, ShieldCheck } from "lucide-react";
 import { currentMember } from "@/lib/repo";
-import { can, getAccess, isSuperAdmin, MODULES, ACTIONS, type Module, type Action } from "@/lib/access";
+import { can, getAccessCtx, isSuperAdmin, MODULES, ACTIONS, type Module, type Action } from "@/lib/access";
 import { ROLE_LABEL } from "@/lib/workflow";
 import { getSettings } from "@/lib/db";
 import { formatDateTime } from "@/lib/time";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function Page() {
   const me = (await currentMember())!;
-  const [access, settings] = await Promise.all([getAccess(), getSettings()]);
+  const [access, settings] = await Promise.all([getAccessCtx(), getSettings()]);
   const sa = isSuperAdmin(me);
   return (
     <div className="mx-auto max-w-[860px] space-y-5">
@@ -32,16 +32,12 @@ export default async function Page() {
       <section className="card p-5">
         <h2 className="text-[15px] font-extrabold">Hak akses Anda</h2>
         <ul className="mt-3 grid gap-1.5 text-[13px] sm:grid-cols-2">
-          {(Object.keys(MODULES) as Module[]).map((m) => (
-            <li key={m} className="flex justify-between gap-2 rounded-lg bg-bg px-3 py-2"><span>{MODULES[m]}</span><span className="text-ink-3">{(Object.keys(ACTIONS) as Action[]).filter((a) => can(access, me, m, a)).map((a) => ACTIONS[a]).join(" · ") || "tidak ada"}</span></li>
+          {(Object.keys(MODULES) as Module[]).filter((m) => can(access, me, m, "view")).map((m) => (
+            <li key={m} className="flex justify-between gap-2 rounded-lg bg-bg px-3 py-2"><span>{MODULES[m]}</span><span className="text-ink-3">{(Object.keys(ACTIONS) as Action[]).filter((a) => can(access, me, m, a)).map((a) => ACTIONS[a]).join(" · ")}</span></li>
           ))}
         </ul>
-        <p className="mt-3 text-[12px] text-ink-3">Hak akses diatur Super Admin di Admin Console.</p>
       </section>
-      <section className="card p-5 text-[13px] text-ink-2">
-        <h2 className="mb-2 text-[15px] font-extrabold text-ink">Status sistem</h2>
-        Mode UAT: <b>{settings.uatMode ? "aktif" : "tidak aktif"}</b> · Maintenance: <b>{settings.maintenance ? "aktif" : "tidak aktif"}</b>
-      </section>
+      {(settings.uatMode || settings.maintenance) && <p className="text-[12.5px] text-ink-3">Mode UAT {settings.uatMode ? "aktif" : "nonaktif"} · Maintenance {settings.maintenance ? "aktif" : "nonaktif"}</p>}
     </div>
   );
 }

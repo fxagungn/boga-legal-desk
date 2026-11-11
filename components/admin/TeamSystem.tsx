@@ -41,14 +41,16 @@ function Toggle({ name, defaultChecked, disabled, title, desc, icon: Icon, tone 
 }
 
 export async function TeamSystem({ tab, preview }: { tab: Tab; preview: boolean }) {
-  const [me, settings, members, demo] = await Promise.all([
+  const [me, settings, everyone, demo] = await Promise.all([
     currentMember(),
     getSettings(),
     listMembers(),
-    query<{ n: number }>(`select ((select count(*) from permits where is_demo) + (select count(*) from agreements where is_demo) + (select count(*) from punishments where is_demo) + (select count(*) from kb_cases where is_demo) + (select count(*) from inspections where is_demo) + (select count(*) from library where is_demo))::int as n`),
+    query<{ n: number }>(`select ((select count(*) from permits where is_demo) + (select count(*) from agreements where is_demo) + (select count(*) from cases where is_demo) + (select count(*) from sigap_results where is_demo) + (select count(*) from kb_cases where is_demo) + (select count(*) from inspections where is_demo) + (select count(*) from library where is_demo))::int as n`),
   ]);
   const lead = Boolean(me && isSuperAdmin(me));
-  const roles = Object.keys(ROLE_LABEL) as Role[];
+  const roles = (Object.keys(ROLE_LABEL) as Role[]).filter((r) => r !== "viewer");
+  const members = everyone.filter((m) => m.role !== "viewer");
+  const viewers = everyone.filter((m) => m.role === "viewer");
 
   return (
     <div className="mx-auto max-w-[1080px]">
@@ -56,7 +58,7 @@ export async function TeamSystem({ tab, preview }: { tab: Tab; preview: boolean 
         <div className="space-y-5">
           <SyncCard lead={lead} preview={preview} />
           <Notice tone="info">
-            Login memakai <b>NIK</b>. Password awal adalah <b>tanggal lahir (DDMMYYYY)</b>, misalnya 17 Agustus 1990 → <code>17081990</code>, dan wajib diganti saat login pertama.
+            Login memakai <b>NIK</b>; password awal <b>tanggal lahir (DDMMYYYY)</b>, wajib diganti saat login pertama.{viewers.length ? <> {viewers.filter((v) => v.active).length} karyawan non-Legal sudah login lewat cohort.</> : null}
           </Notice>
           <Card pad={false}>
             <ul className="divide-y divide-line-2">
@@ -189,7 +191,7 @@ async function SyncCard({ lead, preview }: { lead: boolean; preview: boolean }) 
     <Card title="Sinkron dari data karyawan" sub={<>Sheet <code className="text-[12px]">{employeeSheetId().slice(0, 10)}…</code> dibaca sebagai {googleAccountEmail()}. Otomatis tiap pagi.</>}
       action={<RefreshCw size={18} className="text-ink-3" />}>
       <p className="text-[14px] text-ink-2">
-        {last ? <>Terakhir {formatDateTime(last.at)} oleh {last.actor ?? "sistem"}: {last.legal} karyawan Legal aktif · {last.created} akun baru · {last.deactivated} dinonaktifkan.</> : "Belum pernah dijalankan."}
+        {last ? <>Terakhir {formatDateTime(last.at)} oleh {last.actor ?? "sistem"}: {last.legal} karyawan Legal aktif · {last.created} akun baru · {last.deactivated} dinonaktifkan{last.employees ? <> · {last.employees.toLocaleString("id-ID")} karyawan untuk cohort{last.gradeColumn === false ? " (kolom grade tidak ada)" : ""}</> : null}.</> : "Belum pernah dijalankan."}
       </p>
       {err && <p className="mt-3 rounded-lg bg-bad-bg px-3 py-2 text-[13px] text-bad">{err}</p>}
       {plan && (

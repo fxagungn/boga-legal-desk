@@ -16,12 +16,14 @@ import { cx } from "@/components/ui";
 import { ActionDialog, ActionForm, Submit } from "@/components/actions";
 import { Banner } from "@/components/ldms/bits";
 import { TeamSystem } from "@/components/admin/TeamSystem";
+import { Cohorts } from "@/components/admin/Cohorts";
+import { getCaseConfig } from "@/lib/ldms/cases";
 import * as X from "@/app/admin-actions";
 
 export const dynamic = "force-dynamic";
 
 const TABS = [
-  ["akses", "Hak akses"], ["tim", "Tim & peran"], ["alur", "Alur & notifikasi"], ["master", "Master data"], ["drive", "Google Drive"], ["ai", "AI"], ["sistem", "Sistem"],
+  ["akses", "Hak akses"], ["tim", "Tim & akun"], ["alur", "Alur & SIGAP"], ["master", "Master data"], ["drive", "Google Drive"], ["ai", "AI"], ["sistem", "Sistem"],
 ] as const;
 type Tab = (typeof TABS)[number][0];
 
@@ -47,11 +49,11 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
         ))}
       </nav>
 
-      {tab === "akses" && (
+      {tab === "akses" && <div className="space-y-5"><Cohorts />
         <section className="card overflow-hidden">
           <header className="px-5 py-4">
-            <h2 className="text-[15px] font-extrabold">Hak akses per peran</h2>
-            <p className="mt-1 text-[12.5px] text-ink-3">Centang siapa boleh melihat, mengubah, dan approve/menjalankan tiap modul. Super Admin selalu punya semua akses. Staff tetap hanya bisa mengubah izin yang PIC-nya dia.</p>
+            <h2 className="text-[15px] font-extrabold">Tim Legal per peran</h2>
+            <p className="mt-1 text-[12.5px] text-ink-3">Super Admin selalu punya semua akses.</p>
           </header>
           <ActionForm action={X.saveAccessAction} success="Hak akses disimpan">
             <div className="overflow-x-auto border-t border-line-2">
@@ -66,7 +68,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
                       <td className="px-2 py-1.5 text-ink-2">{ACTIONS[a]}</td>
                       {ROLES.map((r) => (
                         <td key={r} className="px-2 py-1.5 text-center">
-                          <input type="checkbox" name={`${m}.${a}.${r}`} defaultChecked={access[m][a].includes(r)} aria-label={`${MODULES[m]} — ${ACTIONS[a]} — ${ROLE_LABEL[r]}`} className="h-4 w-4 accent-[#c41e29]" />
+                          <input type="checkbox" name={`${m}.${a}.${r}`} defaultChecked={access.matrix[m][a].includes(r)} aria-label={`${MODULES[m]} — ${ACTIONS[a]} — ${ROLE_LABEL[r]}`} className="h-4 w-4 accent-[#c41e29]" />
                         </td>
                       ))}
                     </tr>
@@ -77,7 +79,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
             <div className="flex justify-end border-t border-line-2 px-5 py-3"><Submit>Simpan hak akses</Submit></div>
           </ActionForm>
         </section>
-      )}
+      </div>}
 
       {(tab === "tim" || tab === "sistem") && <TeamSystem tab={tab} preview={sp.preview === "1"} />}
 
@@ -116,7 +118,7 @@ async function FlowsTab() {
     <div className="space-y-5">
       <section className="card p-5">
         <h2 className="text-[15px] font-extrabold">Reminder perizinan & perjanjian</h2>
-        <p className="mt-1 mb-4 text-[12.5px] text-ink-3">Tangga: H-lead → H-lead/2 → H-7 → H-1 → hari ini → overdue harian; somasi harian sampai acknowledge. Legal-only.</p>
+        <p className="mt-1 mb-4 text-[12.5px] text-ink-3">H-ambang → H-ambang/2 → H-7 → H-1 → hari ini → overdue harian.</p>
         <ActionForm action={X.saveReminderFlowAction} success="Disimpan" className="grid gap-3.5">
           <div className="grid gap-3 sm:grid-cols-2">
             {sel("supervisorId", "Legal Supervisor (CC tahap 2+)", flows.reminder.supervisorId, "Supervisor Permit")}
@@ -132,12 +134,13 @@ async function FlowsTab() {
         </ActionForm>
       </section>
       <section className="card p-5">
-        <h2 className="text-[15px] font-extrabold">Pengajuan & approval sanksi</h2>
-        <p className="mt-1 mb-4 text-[12.5px] text-ink-3">Alur: Pengaju → Legal (peran dengan hak &ldquo;Approve&rdquo; Sanksi di tab Hak akses) → HR Business Partner via link aman → tercatat di KB. Alasan pembeda wajib bila keputusan menyimpang dari matrix.</p>
-        <ActionForm action={X.savePunishmentFlowAction} success="Disimpan" className="grid gap-3.5">
-          <div><label className="label" htmlFor="fl-hr">Email HR Business Partner (penerima link approval)</label><input id="fl-hr" name="hrApprovers" defaultValue={flows.punishment.hrApprovers.join(", ")} className="input" placeholder="hrbp@boga.co.id" /></div>
-          <div><label className="label" htmlFor="fl-fn">Fungsi pengaju (satu per baris)</label><textarea id="fl-fn" name="submitterFunctions" rows={6} defaultValue={flows.punishment.submitterFunctions.join("\n")} className="input" /></div>
-          <div><Submit>Simpan alur sanksi</Submit></div>
+        <h2 className="text-[15px] font-extrabold">SIGAP</h2>
+        <p className="mt-1 mb-4 text-[12.5px] text-ink-3">Sistem SIGAP ditampilkan di Data Record › SIGAP. Hasilnya masuk ke Knowledge Base.</p>
+        <ActionForm action={X.saveSigapFlowAction} success="Disimpan" className="grid gap-3.5">
+          <div><label className="label" htmlFor="sg-url">Link SIGAP</label><input id="sg-url" name="url" type="url" defaultValue={flows.sigap.url} placeholder="https://…" className="input" /></div>
+          <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" name="newTab" defaultChecked={flows.sigap.newTab} className="h-4 w-4 accent-[#c41e29]" /> Buka di tab baru (bila SIGAP tidak bisa di-embed)</label>
+          <div><label className="label" htmlFor="sg-cat">Kategori pelanggaran (satu per baris)</label><textarea id="sg-cat" name="categories" rows={5} defaultValue={flows.sigap.categories.join("\n")} className="input" /></div>
+          <div><Submit>Simpan SIGAP</Submit></div>
         </ActionForm>
       </section>
     </div>
@@ -145,6 +148,7 @@ async function FlowsTab() {
 }
 
 async function MasterTab() {
+  const caseCfg = await getCaseConfig();
   const [brands, types, units] = await Promise.all([
     query<{ id: number; name: string; has_principal: boolean; principal_name: string | null; currency: string; active: boolean }>(`select id, name, has_principal, principal_name, currency, active from brands order by name`),
     query<{ id: number; code: string; name: string; scope: string; lead_days: number; validity_years: string | null; agency: string | null; est_cost: string | null; blocker_note: string | null; active: boolean }>(`select id, code, name, scope, lead_days, validity_years::text, agency, est_cost::text, blocker_note, active from permit_types order by sort`),
@@ -173,6 +177,18 @@ async function MasterTab() {
   );
   return (
     <div className="space-y-5">
+      <section className="card p-5">
+        <h2 className="text-[15px] font-extrabold">Kategori case</h2>
+        <ActionForm action={X.saveCaseConfigAction} success="Disimpan" className="mt-3 grid gap-3">
+          <div className="grid gap-3 md:grid-cols-2">
+            {([["categories", "Kategori case"], ["rootCauses", "Kategori root cause"], ["forums", "Forum"], ["outcomes", "Hasil akhir"]] as const).map(([k, l]) => (
+              <div key={k}><label className="label" htmlFor={`cc-${k}`}>{l} (satu per baris)</label><textarea id={`cc-${k}`} name={k} rows={6} defaultValue={caseCfg[k].join("\n")} className="input" /></div>
+            ))}
+          </div>
+          <div><Submit>Simpan kategori</Submit></div>
+        </ActionForm>
+      </section>
+
       <section className="card overflow-hidden">
         <header className="flex flex-wrap items-center gap-2 px-5 py-4">
           <h2 className="text-[15px] font-extrabold">Outlet & unit</h2>
@@ -278,9 +294,7 @@ async function DriveTab() {
   const sa = googleAccountEmail();
   return (
     <div className="space-y-5">
-      <Banner tone="info" icon={FolderOpen}>
-        <b>Google Drive = repository tim Legal.</b> Semua perubahan di LDMS ditulis juga ke spreadsheet <b>LDMS_DB</b> (satu tab per modul); Knowledge Base dibaca dari Google Docs (7 heading) dan sanksi yang disetujui ditambahkan ke sana; semua Google Docs & Sheets di folder diindeks supaya <b>Tanya LDMS</b> bisa menjawab dari isinya.
-      </Banner>
+      <Banner tone="info" icon={FolderOpen}>Semua data LDMS ditulis ke <b>LDMS_DB</b>, pelajaran KB ke Google Docs, dan isi folder diindeks untuk Tanya LDMS.</Banner>
       <section className="card p-5">
         <h2 className="text-[15px] font-extrabold">Sambungkan folder</h2>
         <ol className="mt-2 list-decimal space-y-1 pl-5 text-[13px] text-ink-2">
@@ -297,7 +311,7 @@ async function DriveTab() {
           <Ok ok={googleConfigured()} sub={googleConfigured() ? sa : "Isi GOOGLE_SERVICE_ACCOUNT_JSON di Vercel (dipakai juga untuk sinkron karyawan)."}>Service account Google</Ok>
           <Ok ok={Boolean(d.folderId)} sub={d.folderId ? <a href={d.folderUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1">Buka folder <ExternalLink size={12} /></a> : "Belum disambungkan."}>Folder repository</Ok>
           <Ok ok={Boolean(d.dbSheetId)} sub={d.dbSheetId ? <><a href={`https://docs.google.com/spreadsheets/d/${d.dbSheetId}/edit`} target="_blank" rel="noreferrer">LDMS_DB</a> · {mirror ? `ditulis ${formatDateTime(mirror.at)} (${mirror.tabs} tab)` : "belum ditulis"}{mirrorErr && (!mirror || mirrorErr.at > mirror.at) ? <span className="text-bad"> · error: {mirrorErr.error.slice(0, 140)}</span> : null}</> : undefined}><FileSpreadsheet size={14} className="inline" /> Spreadsheet LDMS_DB</Ok>
-          <Ok ok={Boolean(d.kbDocId)} sub={d.kbDocId ? <><a href={`https://docs.google.com/document/d/${d.kbDocId}/edit`} target="_blank" rel="noreferrer">Knowledge Base — Yurisprudensi</a> · {kb ? `sinkron ${formatDateTime(kb.at)} (${kb.cases} case)` : "belum disinkron"}</> : undefined}>Google Doc Knowledge Base</Ok>
+          <Ok ok={Boolean(d.kbDocId)} sub={d.kbDocId ? <><a href={`https://docs.google.com/document/d/${d.kbDocId}/edit`} target="_blank" rel="noreferrer">Knowledge Base</a> · {kb ? `sinkron ${formatDateTime(kb.at)} (${kb.cases} entri)` : "belum disinkron"}</> : undefined}>Google Doc Knowledge Base</Ok>
           <Ok ok={Boolean(idx)} sub={idx ? `Diindeks ${formatDateTime(idx.at)} · ${idx.files} file` : "Belum diindeks."}><Database size={14} className="inline" /> Index Tanya LDMS</Ok>
         </ul>
         {d.folderId && (
@@ -327,7 +341,7 @@ async function AiLog() {
   );
   return (
     <section className="card overflow-hidden">
-      <header className="px-5 py-4"><h2 className="text-[15px] font-extrabold">Log AI (AI_Audit)</h2><p className="text-[12px] text-ink-3">Setiap panggilan AI tercatat: modul, user, model, keyakinan, referensi, dan keputusan manusia.</p></header>
+      <header className="px-5 py-4"><h2 className="text-[15px] font-extrabold">Log AI</h2></header>
       <div className="overflow-x-auto border-t border-line-2">
         <table className="w-full min-w-[760px] text-left text-[12.5px]">
           <thead className="bg-[#fafbfc] text-[10.5px] font-bold tracking-[0.5px] text-ink-3 uppercase"><tr><th className="px-5 py-2 font-bold">Waktu</th><th className="px-2 py-2 font-bold">Modul</th><th className="px-2 py-2 font-bold">User</th><th className="px-2 py-2 font-bold">Hasil</th><th className="px-2 py-2 font-bold">Referensi</th><th className="px-2 py-2 font-bold">Keputusan</th></tr></thead>

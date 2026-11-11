@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { one, query } from "@/lib/db";
 import { requireMember } from "@/lib/repo";
-import { ACTIONS, isSuperAdmin, MODULES, ROLES, saveAccess, type AccessMatrix, type Action, type Module } from "@/lib/access";
+import { ACTIONS, getCohorts, isSuperAdmin, MODULES, ROLES, saveAccess, saveCohorts, type AccessMatrix, type Action, type Cohort, type Module } from "@/lib/access";
+import { DEFAULT_CASE_CONFIG, saveCaseConfig } from "@/lib/ldms/cases";
 import { saveFlows } from "@/lib/flows";
 import { indexDrive, mirrorToDrive, setupDrive, syncKbFromDocs } from "@/lib/drive";
 import { driveIdFromUrl, readSheet } from "@/lib/google";
@@ -40,7 +41,7 @@ export async function saveAccessAction(_: Result, f: FormData): Promise<Result> 
       for (const act of Object.keys(ACTIONS) as Action[]) a[m][act] = ROLES.filter((r) => f.get(`${m}.${act}.${r}`) === "on");
     }
     await saveAccess(a);
-    await audit(me, "ubah hak akses", "admin", "access", "Matrix akses peran × modul diperbarui");
+    await audit(me, "ubah hak akses", "admin", "access", "Matrix akses Tim Legal diperbarui");
     return "Hak akses disimpan";
   });
 }
@@ -59,14 +60,71 @@ export async function saveReminderFlowAction(_: Result, f: FormData): Promise<Re
   });
 }
 
-export async function savePunishmentFlowAction(_: Result, f: FormData): Promise<Result> {
+export async function saveSigapFlowAction(_: Result, f: FormData): Promise<Result> {
   return run(async () => {
     const me = await sa();
-    const emails = str(f, "hrApprovers").split(/[,\s;]+/).filter((e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e));
-    const fns = str(f, "submitterFunctions").split("\n").map((s) => s.trim()).filter(Boolean);
-    await saveFlows({ punishment: fns.length ? { hrApprovers: emails, submitterFunctions: fns } : { hrApprovers: emails } });
-    await audit(me, "ubah alur sanksi", "admin", "flows", `HR approver: ${emails.join(", ") || "—"}`);
-    return "Alur sanksi disimpan";
+    const url = str(f, "url");
+    if (url && !/^https:\/\//i.test(url)) throw new Error("Link SIGAP harus diawali https://");
+    const categories = str(f, "categories").split("\n").map((x) => x.trim()).filter(Boolean);
+    await saveFlows({ sigap: { url, newTab: f.get("newTab") === "on", ...(categories.length ? { categories } : {}) } });
+    await audit(me, "ubah pengaturan SIGAP", "admin", "sigap", url || "belum tersambung");
+    return "Pengaturan SIGAP disimpan";
+  });
+}
+
+export async function saveCaseConfigAction(_: Result, f: FormData): Promise<Result> {
+  return run(async () => {
+    const me = await sa();
+    const list = (k: string) => [...new Set(str(f, k).split("\n").map((x) => x.trim()).filter(Boolean))];
+    const cfg = { categories: list("categories"), rootCauses: list("rootCauses"), forums: list("forums"), outcomes: list("outcomes") };
+    if (!cfg.categories.length) throw new Error("Minimal satu kategori case.");
+    if (!cfg.outcomes.length) throw new Error("Minimal satu hasil akhir.");
+    await saveCaseConfig({ ...DEFAULT_CASE_CONFIG, ...Object.fromEntries(Object.entries(cfg).filter(([, v]) => v.length)) });
+    await audit(me, "ubah kategori case", "admin", "cases", cfg.categories.join(", "));
+    return "Kategori case disimpan";
+  });
+}
+
+/* ---------- cohorts ---------- */
+
+export async function saveCohortAction(_: Result, f: FormData): Promise<Result> {
+  return run(async () => {
+    const me = await sa();
+    const name = str(f, "name");
+    if (!name) throw new Error("Beri nama cohort.");
+    const words = (k: string) => str(f, k).split(/[,;\n]+/).map((x) => x.trim()).filter(Boolean);
+    const perms: Cohort["perms"] = {};
+    for (const m of Object.keys(MODULES) as Module[]) {
+      const acts = (Object.keys(ACTIONS) as Action[]).filter((a) => f.get(`p.${m}.${a}`) === "on");
+      // Editing or approving implies seeing.
+      if (acts.length && !acts.includes("view")) acts.unshift("view");
+      if (acts.length) perms[m] = acts;
+    }
+    const c: Cohort = {
+      id: str(f, "cid") || `c${Date.now().toString(36)}`, name, enabled: f.get("enabled") === "on",
+      grades: f.getAll("grades").map(String).filter(Boolean), depts: words("depts"), titles: words("titles"),
+      niks: words("niks").map((n) => n.toUpperCase().replace(/\s+/g, "")), perms,
+    };
+    if (!c.grades.length && !c.depts.length && !c.titles.length && !c.niks.length) throw new Error("Isi minimal satu kriteria: grade, departemen/brand, jabatan, atau NIK.");
+    if (!Object.keys(perms).length) throw new Error("Centang minimal satu modul.");
+    const all = await getCohorts();
+    const i = all.findIndex((x) => x.id === c.id);
+    if (i >= 0) all[i] = c; else all.push(c);
+    await saveCohorts(all);
+    await audit(me, i >= 0 ? "ubah cohort akses" : "tambah cohort akses", "admin", "cohort", `${name}: ${Object.keys(perms).join(", ")}`);
+    return "Cohort disimpan";
+  });
+}
+
+export async function deleteCohortAction(_: Result, f: FormData): Promise<Result> {
+  return run(async () => {
+    const me = await sa();
+    const id = str(f, "cid");
+    const all = await getCohorts();
+    const c = all.find((x) => x.id === id);
+    await saveCohorts(all.filter((x) => x.id !== id));
+    await audit(me, "hapus cohort akses", "admin", "cohort", c?.name ?? id);
+    return "Cohort dihapus";
   });
 }
 
@@ -95,7 +153,7 @@ export async function driveJobAction(_: Result, f: FormData): Promise<Result> {
     const job = str(f, "job");
     if (job === "mirror") { const r = await mirrorToDrive(); await audit(me, "sinkron ke Drive", "admin", "drive", JSON.stringify(r)); return "Database ditulis ke spreadsheet LDMS_DB"; }
     if (job === "index") { const r = await indexDrive(); await audit(me, "index Drive", "admin", "drive", `${r.files} file`); return `Index selesai: ${r.files} file (${r.indexed} diperbarui)`; }
-    if (job === "kb") { const r = await syncKbFromDocs(); await audit(me, "sinkron KB", "admin", "drive", `${r.cases} case`); return `KB: ${r.cases} case dari Google Docs`; }
+    if (job === "kb") { const r = await syncKbFromDocs(); await audit(me, "sinkron KB", "admin", "drive", `${r.cases} entri`); return `KB: ${r.cases} entri dari Google Docs`; }
     if (job === "mirror-toggle") { await saveFlows({ drive: { mirrorEnabled: f.get("mirrorEnabled") === "on" } }); return "Disimpan"; }
     throw new Error("Job tidak dikenal.");
   });

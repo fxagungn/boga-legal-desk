@@ -24,18 +24,18 @@ export async function setupDrive(folderUrl: string) {
   let kbDocId = f.folderId === folderId ? f.kbDocId : "";
   const files = await driveListFolder(folderId);
   if (!dbSheetId) dbSheetId = files.find((x) => x.name === "LDMS_DB" && x.mimeType.endsWith("spreadsheet"))?.id ?? "";
-  if (!kbDocId) kbDocId = files.find((x) => /yurisprudensi/i.test(x.name) && x.mimeType.endsWith("document"))?.id ?? "";
+  if (!kbDocId) kbDocId = files.find((x) => /knowledge base|yurisprudensi/i.test(x.name) && x.mimeType.endsWith("document"))?.id ?? "";
   const shared = Boolean(folder.driveId);
   if (!dbSheetId) {
     if (!shared) throw new Error("Folder ini ada di My Drive. Buat spreadsheet bernama LDMS_DB di folder itu (share Editor ke service account), atau pakai folder di Shared Drive.");
     dbSheetId = (await driveCreate("LDMS_DB", "application/vnd.google-apps.spreadsheet", folderId)).id;
   }
   if (!kbDocId) {
-    if (!shared) throw new Error("Buat Google Doc \"Knowledge Base — Yurisprudensi Kasus Boga Group\" di folder itu, atau pakai folder di Shared Drive.");
-    kbDocId = (await driveCreate("Knowledge Base — Yurisprudensi Kasus Boga Group", "application/vnd.google-apps.document", folderId)).id;
+    if (!shared) throw new Error("Buat Google Doc \"Knowledge Base — LDMS Boga Group\" di folder itu, atau pakai folder di Shared Drive.");
+    kbDocId = (await driveCreate("Knowledge Base — LDMS Boga Group", "application/vnd.google-apps.document", folderId)).id;
     await docsAppend(kbDocId, [
-      { text: "Knowledge Base — Yurisprudensi Kasus Boga Group", style: "TITLE" },
-      { text: "Satu case = Heading 1 \"YRS-YYYY-NNN — Judul\", lalu 7 Heading 2: Ringkasan Case, Kronologi, Langkah Investigasi, Lokasi, Fungsi Terlibat & Pemutus, Sanksi, Pertimbangan. Tanpa nama/inisial karyawan.", style: "NORMAL_TEXT" },
+      { text: "Knowledge Base — LDMS Boga Group", style: "TITLE" },
+      { text: `Satu entri = Heading 1 "KB-YYYY-NNN — Judul", lalu Heading 2: ${KB_HEADINGS.join(", ")}. Tanpa nama karyawan.`, style: "NORMAL_TEXT" },
     ]);
   }
   await saveFlows({ drive: { folderUrl, folderId, dbSheetId, kbDocId } });
@@ -64,10 +64,14 @@ export async function mirrorToDrive() {
     tab("Notes", `select entity, entity_id, body, by_name, created_at from notes order by created_at desc limit 5000`),
     tab("Agreements", `select a.code, a.kind, p.code as parent, b.name as brand, u.name as unit, a.title, a.counterparty, a.principal, a.location, a.city, a.scheme, a.start_date, a.end_date, a.notice_days, a.tenor, a.currency, a.value, a.unit_fee, a.royalty_pct, a.termination_clause, a.status
        from agreements a left join agreements p on p.id = a.parent_id left join brands b on b.id = a.brand_id left join units u on u.id = a.unit_id order by a.kind, a.code`),
-    tab("Matrix_Disiplin", `select code, category, sub_category, s_1st, s_repeat, s_severe, appeal, authority, version from matrix_rules order by sort`),
-    tab("Punishments", `select p.code, p.submitter_fn, u.name as unit, p.matrix_code, p.occurrence, p.matrix_std, p.proposed, p.description, p.ai_level, p.ai_code, p.ai_reason, p.final, p.deviation_reason, p.legal_by, p.legal_at, p.hr_by, p.hr_at, p.status, p.rejected_reason, p.appeal, p.authority, p.created_at
-       from punishments p left join units u on u.id = p.unit_id order by p.code`),
-    tab("KB_Cases", `select code, case_date, title, unit_label, matrix_code, category, location, investigation, functions, decider, sanction, summary, chronology, reasoning, source from kb_cases order by code`),
+    tab("Cases", `select c.code, c.category, c.title, u.name as unit, c.incident_date, c.reported_date, c.reporter, c.counterparty, c.forum, c.risk, c.exposure, c.chronology,
+       c.root_cause_cat, c.root_cause, m.name as pic_legal, c.external_counsel, c.status, c.decision, c.outcome, c.settlement, c.closed_at, c.lesson, c.preventive, c.kb_code
+       from cases c left join units u on u.id = c.unit_id left join team_members m on m.id = c.pic_id order by c.code`),
+    tab("Case_Flow", `select c.code, s.step_date, s.stage, s.handler, s.action, s.by_name from case_steps s join cases c on c.id = s.case_id order by c.code, s.step_date, s.id`),
+    tab("Case_Files", `select c.code, d.kind, d.label, d.url, d.doc_date, d.by_name from case_docs d join cases c on c.id = d.case_id order by c.code, d.id`),
+    tab("SIGAP", `select s.code, s.ref, s.result_date, u.name as unit, s.category, s.violation, s.decision, s.root_cause, s.lesson, s.kb_code
+       from sigap_results s left join units u on u.id = s.unit_id order by s.result_date desc`),
+    tab("Knowledge_Base", `select code, case_date, title, unit_label, category, summary, root_cause, investigation as alur, sanction as keputusan, outcome, lesson, source from kb_cases order by case_date desc nulls last`),
     tab("Inspections", `select i.code, i.insp_date, i.agency, i.kind, u.name as unit, i.result, i.findings, i.follow_up, i.consequence, i.fine, m.name as pic_legal, i.closed_at, i.next_expected
        from inspections i left join units u on u.id = i.unit_id left join team_members m on m.id = i.pic_id order by i.insp_date desc`),
     tab("Library", `select code, kind, doc_date, title, parties, core, key_points, outcome, file_url from library order by code`),
@@ -152,28 +156,28 @@ export async function searchDrive(q: string, limit = 6): Promise<DriveHit[]> {
   });
 }
 
-/* ---------- Knowledge Base (Google Docs → kb_cases) ---------- */
+/* ---------- Knowledge Base (Google Docs ⇄ kb_cases) ---------- */
 
 const KB_FIELDS: Record<string, string> = {
-  "ringkasan case": "summary", kronologi: "chronology", "langkah investigasi": "investigation", lokasi: "location",
-  "fungsi terlibat & pemutus": "functions", sanksi: "sanction", pertimbangan: "reasoning",
+  ringkasan: "summary", kategori: "category", "root cause": "root_cause", "alur penanganan": "investigation", keputusan: "sanction", hasil: "outcome", pelajaran: "lesson",
 };
+const KB_HEADINGS = ["Ringkasan", "Kategori", "Root Cause", "Alur Penanganan", "Keputusan", "Hasil", "Pelajaran"];
 
 export async function syncKbFromDocs() {
   const f = (await getFlows()).drive;
   if (!googleConfigured() || !f.kbDocId) throw new Error("Google Doc Knowledge Base belum disiapkan di Admin Console.");
   const { paragraphs, revisionId } = await docsParagraphs(f.kbDocId);
-  type Case = { code: string; title: string; f: Record<string, string> };
-  const cases: Case[] = [];
-  let cur: Case | null = null;
+  type Entry = { code: string; title: string; f: Record<string, string> };
+  const entries: Entry[] = [];
+  let cur: Entry | null = null;
   let field: string | null = null;
   for (const p of paragraphs) {
     const text = p.text.trim();
     if (!text) continue;
     if (p.style === "HEADING_1") {
-      const m = text.match(/^(YRS-\d{4}-\d{3})\s*[—–-]\s*(.+)$/);
+      const m = text.match(/^((?:KB|YRS)-[A-Z0-9-]+?-\d{3})\s*[—–-]\s*(.+)$/);
       cur = m ? { code: m[1], title: m[2].trim(), f: {} } : null;
-      if (cur) cases.push(cur);
+      if (cur) entries.push(cur);
       field = null;
     } else if (p.style === "HEADING_2" && cur) {
       const k = Object.keys(KB_FIELDS).find((x) => text.toLowerCase().startsWith(x));
@@ -183,44 +187,30 @@ export async function syncKbFromDocs() {
     }
   }
   const warnings: string[] = [];
-  for (const c of cases) {
-    const missing = Object.values(KB_FIELDS).filter((k) => !c.f[k]);
-    if (missing.length) warnings.push(`${c.code}: heading kosong/tidak ada — ${missing.join(", ")}`);
-    const code = (c.f.sanction ?? "").match(/\b([A-Z]{2}-\d{2}(?:-[A-Z]{1,2})?)\b/)?.[1] ?? null;
+  for (const e of entries) {
+    if (!e.f.lesson) warnings.push(`${e.code}: heading "Pelajaran" kosong`);
+    // Entries that came from a Case / SIGAP stay owned by LDMS; the Doc only adds or edits its own entries.
     await query(
-      `insert into kb_cases (code, title, summary, chronology, investigation, location, functions, sanction, reasoning, matrix_code, source, doc_revision, synced_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'docs',$11,now())
-       on conflict (code) do update set title = excluded.title, summary = excluded.summary, chronology = excluded.chronology, investigation = excluded.investigation,
-         location = excluded.location, functions = excluded.functions, sanction = excluded.sanction, reasoning = excluded.reasoning,
-         matrix_code = coalesce(excluded.matrix_code, kb_cases.matrix_code), source = 'docs', doc_revision = excluded.doc_revision, synced_at = now(), is_demo = false`,
-      [c.code, c.title, c.f.summary ?? null, c.f.chronology ?? null, c.f.investigation ?? null, c.f.location ?? null, c.f.functions ?? null, c.f.sanction ?? null, c.f.reasoning ?? null, code, revisionId],
+      `insert into kb_cases (code, title, summary, category, root_cause, investigation, sanction, outcome, lesson, source, doc_revision, synced_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'docs',$10,now())
+       on conflict (code) do update set title = excluded.title, summary = excluded.summary, category = excluded.category, root_cause = excluded.root_cause,
+         investigation = excluded.investigation, sanction = excluded.sanction, outcome = excluded.outcome, lesson = excluded.lesson,
+         doc_revision = excluded.doc_revision, synced_at = now(), is_demo = false
+       where kb_cases.case_id is null and kb_cases.sigap_id is null`,
+      [e.code, e.title, e.f.summary ?? null, e.f.category ?? null, e.f.root_cause ?? null, e.f.investigation ?? null, e.f.sanction ?? null, e.f.outcome ?? null, e.f.lesson ?? null, revisionId],
     );
   }
-  await setKV("kb_sync", { at: new Date().toISOString(), cases: cases.length, warnings, revisionId });
-  return { cases: cases.length, warnings };
+  await setKV("kb_sync", { at: new Date().toISOString(), cases: entries.length, warnings, revisionId });
+  return { cases: entries.length, warnings };
 }
 
-export async function appendCaseToKb(c: { code: string; title: string; summary: string; chronology: string; investigation: string; location: string; functions: string; sanction: string; reasoning: string }) {
+export async function appendCaseToKb(c: { code: string; title: string; summary: string; category: string; rootCause: string; flow: string; decision: string; outcome: string; lesson: string }) {
   const f = (await getFlows()).drive;
   if (!googleConfigured() || !f.kbDocId) return false;
+  const body = [c.summary, c.category, c.rootCause, c.flow, c.decision, c.outcome, c.lesson];
   await docsAppend(f.kbDocId, [
     { text: `${c.code} — ${c.title}`, style: "HEADING_1" },
-    { text: "Ringkasan Case", style: "HEADING_2" }, { text: c.summary || "-", style: "NORMAL_TEXT" },
-    { text: "Kronologi", style: "HEADING_2" }, { text: c.chronology || "-", style: "NORMAL_TEXT" },
-    { text: "Langkah Investigasi", style: "HEADING_2" }, { text: c.investigation || "-", style: "NORMAL_TEXT" },
-    { text: "Lokasi", style: "HEADING_2" }, { text: c.location || "-", style: "NORMAL_TEXT" },
-    { text: "Fungsi Terlibat & Pemutus", style: "HEADING_2" }, { text: c.functions || "-", style: "NORMAL_TEXT" },
-    { text: "Sanksi", style: "HEADING_2" }, { text: c.sanction || "-", style: "NORMAL_TEXT" },
-    { text: "Pertimbangan", style: "HEADING_2" }, { text: c.reasoning || "-", style: "NORMAL_TEXT" },
+    ...KB_HEADINGS.flatMap((h, i) => [{ text: h, style: "HEADING_2" as const }, { text: body[i] || "-", style: "NORMAL_TEXT" as const }]),
   ]);
   return true;
-}
-
-/** Save a letter draft as a Google Doc in the LDMS folder (returns its link). */
-export async function saveLetterToDrive(title: string, body: string) {
-  const f = (await getFlows()).drive;
-  if (!googleConfigured() || !f.folderId) throw new Error("Google Drive belum disiapkan di Admin Console.");
-  const doc = await driveCreate(title, "application/vnd.google-apps.document", f.folderId);
-  await docsAppend(doc.id, body.split("\n").map((t, i) => ({ text: t || " ", style: i === 0 ? "HEADING_1" : "NORMAL_TEXT" })));
-  return doc.webViewLink ?? `https://docs.google.com/document/d/${doc.id}/edit`;
 }

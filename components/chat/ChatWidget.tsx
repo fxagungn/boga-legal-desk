@@ -8,22 +8,22 @@ interface Msg { role: "user" | "assistant"; content: string }
 
 const SUGGESTIONS = [
   "Izin apa yang overdue dan siapa PIC-nya?",
-  "Dokumen mana yang bersomasi dan bagaimana status acknowledge-nya?",
-  "ULA mana yang berakhir paling dekat dan berapa unit fee-nya?",
-  "Berapa total estimasi biaya renewal 30 hari ke depan per brand?",
-  "Sanksi untuk merokok berulang menurut matrix?",
+  "ULA mana yang berakhir paling dekat?",
+  "Case apa yang masih berjalan dan risikonya tinggi?",
+  "Root cause apa yang paling sering muncul di case?",
   "Temuan Disnakertrans apa yang berulang?",
 ];
 
-const ID_RE = /\b(D\d{4}|(?:MLA|ULA|PKS|PSM)-\d{3}|PNS-\d{4}-\d{3}|YRS-\d{4}-\d{3}|INS-\d{4}-\d{3}|LIB-[A-Z]{2,3}-\d{3})\b/g;
+const ID_RE = /\b(D\d{4}|(?:MLA|ULA|PKS)-\d{3}|KB-(?:CASE-|SGP-)?\d{4}-\d{3}|CASE-\d{4}-\d{3}|SGP-\d{4}-\d{3}|INS-\d{4}-\d{3}|LIB-[A-Z]{2,3}-\d{3})\b/g;
 
 function hrefFor(id: string) {
   if (/^D\d/.test(id)) return `/perizinan?pic=all&d=${id}`;
-  if (/^(MLA|ULA|PKS|PSM)-/.test(id)) return `/perjanjian?tab=${id.slice(0, 3)}&d=${id}`;
-  if (id.startsWith("PNS-")) return `/sanksi#${id}`;
-  if (id.startsWith("YRS-")) return `/kb#${id}`;
-  if (id.startsWith("INS-")) return `/pemeriksaan#${id}`;
-  return `/pustaka#${id}`;
+  if (/^(MLA|ULA|PKS)-/.test(id)) return `/perjanjian?tab=${id.slice(0, 3)}&d=${id}`;
+  if (id.startsWith("KB-")) return `/kb?d=${id}`;
+  if (id.startsWith("CASE-")) return `/cases?s=semua&d=${id}`;
+  if (id.startsWith("SGP-")) return `/sigap?tab=hasil`;
+  if (id.startsWith("INS-")) return `/pemeriksaan?d=${id}`;
+  return `/repository?d=${id}`;
 }
 
 /** Turns document IDs in an answer into clickable chips. */
@@ -103,7 +103,7 @@ export function ChatWidget({ name, inline = false }: { name: string; inline?: bo
         <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand text-white"><Sparkles size={16} /></span>
         <div className="min-w-0 flex-1 leading-tight">
           <div className="text-[14px] font-extrabold">Tanya LDMS</div>
-          <div className="text-[11.5px] text-ink-3">Jawaban dari data LDMS & Google Drive tim Legal</div>
+          <div className="text-[11.5px] text-ink-3">Dari data LDMS & Google Drive</div>
         </div>
         {msgs.length > 0 && <button type="button" onClick={reset} className="btn btn-ghost btn-sm px-2" aria-label="Mulai percakapan baru" title="Mulai baru"><RotateCcw size={16} /></button>}
         {!inline && <button type="button" onClick={() => setOpen(false)} className="btn btn-ghost btn-sm px-2" aria-label="Tutup chat"><X size={18} /></button>}
@@ -113,7 +113,7 @@ export function ChatWidget({ name, inline = false }: { name: string; inline?: bo
         {!ready.ok && <p className="rounded-lg border border-warn/20 bg-warn-bg px-3 py-2 text-[12.5px] text-warn">{ready.reason}</p>}
         {msgs.length === 0 && (
           <div>
-            <p className="text-[13px] text-ink-2">Halo {name.split(" ")[0]}, tanya apa saja soal perizinan, agreement, sanksi, preseden, pemeriksaan, atau dokumen di Drive. ID di jawaban bisa diklik.</p>
+            <p className="text-[13px] text-ink-2">Halo {name.split(" ")[0]}, mau cari apa?</p>
             <div className="mt-3 flex flex-col gap-1.5">
               {SUGGESTIONS.map((s) => (
                 <button key={s} type="button" onClick={() => send(s)} disabled={busy || !ready.ok} className="rounded-lg border border-line px-3 py-2 text-left text-[12.5px] text-ink-2 hover:border-brand-line hover:bg-brand-subtle hover:text-ink disabled:opacity-50">{s}</button>

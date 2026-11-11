@@ -8,7 +8,7 @@ export function AdviceView({ r }: { r: AdviceResult }) {
   return (
     <div className="space-y-3 text-[13px]">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-md bg-warn-bg px-2 py-0.5 text-[11px] font-bold text-warn">DRAFT — untuk approval Legal Supervisor</span>
+        <span className="rounded-md bg-warn-bg px-2 py-0.5 text-[11px] font-bold text-warn">DRAFT</span>
         <span className="text-[12px] font-semibold text-ink-2">Keyakinan: {r.keyakinan}</span>
       </div>
       <p>{r.ringkasan}</p>
@@ -28,7 +28,7 @@ export function AdviceView({ r }: { r: AdviceResult }) {
 }
 
 export function LibraryConsult({ ai }: { ai: string | null }) {
-  const [f, setF] = useState({ kind: "PSM", counterparty: "", value: "", issue: "" });
+  const [f, setF] = useState({ kind: "PKS", counterparty: "", value: "", issue: "" });
   const [busy, setBusy] = useState(false);
   const [r, setR] = useState<AdviceResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -36,11 +36,11 @@ export function LibraryConsult({ ai }: { ai: string | null }) {
     <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <div><label className="label" htmlFor="lc-k">Jenis dokumen</label>
-          <select id="lc-k" className="input" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}>{["PSM", "PKS", "License", "Legal Opinion"].map((k) => <option key={k}>{k}</option>)}</select></div>
+          <select id="lc-k" className="input" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}>{["PKS", "MLA / ULA", "Legal Opinion", "Case", "Lainnya"].map((k) => <option key={k}>{k}</option>)}</select></div>
         <div><label className="label" htmlFor="lc-cp">Pihak lawan</label><input id="lc-cp" className="input" value={f.counterparty} onChange={(e) => setF({ ...f, counterparty: e.target.value })} /></div>
       </div>
       <div><label className="label" htmlFor="lc-v">Nilai / tenor</label><input id="lc-v" className="input" value={f.value} onChange={(e) => setF({ ...f, value: e.target.value })} /></div>
-      <div><label className="label" htmlFor="lc-i">Isu (klausul sengketa / permintaan pihak lawan / keputusan bisnis)</label><textarea id="lc-i" rows={3} className="input" value={f.issue} onChange={(e) => setF({ ...f, issue: e.target.value })} /></div>
+      <div><label className="label" htmlFor="lc-i">Isu</label><textarea id="lc-i" rows={3} className="input" value={f.issue} onChange={(e) => setF({ ...f, issue: e.target.value })} /></div>
       {ai && <p className="rounded-lg border border-warn/20 bg-warn-bg px-3 py-2 text-[12.5px] text-warn">{ai}</p>}
       <button type="button" className="btn btn-primary" disabled={busy || !!ai || f.issue.trim().length < 10} onClick={async () => {
         setBusy(true); setErr(null); setR(null);
@@ -74,7 +74,7 @@ export function InspectionPrep({ ai, units }: { ai: string | null; units: { id: 
         const out = await inspectionAdviceAction(f);
         setBusy(false);
         if (out && "ok" in out) setR(out.data); else if (out && "error" in out) setErr(out.error);
-      }}>{busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Susun rekomendasi tindak lanjut</button>
+      }}>{busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />} Susun rekomendasi</button>
       {err && <p className="text-[13px] text-bad">{err}</p>}
       {r && (
         <div className="space-y-3 rounded-xl border border-line p-4">

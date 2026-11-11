@@ -4,7 +4,9 @@ import { z } from "zod";
 import { query } from "./db";
 import { searchDrive } from "./drive";
 import { getAgreementByCode, listAgreements } from "./ldms/agreements";
-import { getRule, listMatrix, listPunishments, matrixSanksi } from "./ldms/discipline";
+import type { Module } from "./access";
+import { CASE_STATUS, caseInsight, listCases, listSteps } from "./ldms/cases";
+import { listSigap } from "./ldms/sigap";
 import { listInspections, listKb, listLibrary } from "./ldms/history";
 import { getPermitByCode, listNotes, listPermits, needsAck, RENEWAL_LABEL } from "./ldms/permits";
 
@@ -14,8 +16,9 @@ const has = (hay: (string | null | undefined)[], q?: string) => {
   return q.toLowerCase().split(/\s+/).filter(Boolean).every((w) => t.includes(w));
 };
 
-export function ldmsTools() {
-  return {
+/** Tools for the chat, limited to the modules the signed-in user may view. */
+export function ldmsTools(canView: (m: Module) => boolean) {
+  const all = {
     search_permits: tool({
       description: "Cari izin di registry perizinan. Bisa filter teks (unit, jenis izin, nomor, PIC, brand, kota, isi somasi), status waktu, brand, dan PIC. Hasil urut paling mendesak.",
       inputSchema: z.object({
@@ -47,8 +50,8 @@ export function ldmsTools() {
     }),
 
     search_agreements: tool({
-      description: "Cari perjanjian MLA, ULA, PKS, PSM. Filter jenis, kata kunci (judul, pihak, lokasi, brand), dan maksimal sisa hari sebelum berakhir.",
-      inputSchema: z.object({ kind: z.enum(["MLA", "ULA", "PKS", "PSM"]).optional(), q: z.string().optional(), maxDays: z.number().int().optional() }),
+      description: "Cari perjanjian MLA, ULA, PKS. Filter jenis, kata kunci (judul, pihak, lokasi, brand), dan maksimal sisa hari sebelum berakhir.",
+      inputSchema: z.object({ kind: z.enum(["MLA", "ULA", "PKS"]).optional(), q: z.string().optional(), maxDays: z.number().int().optional() }),
       execute: async ({ kind, q, maxDays }) => {
         const rows = (await listAgreements()).filter((a) => (!kind || a.kind === kind) && has([a.code, a.title, a.counterparty, a.principal, a.location, a.city, a.brand, a.scheme], q) && (maxDays === undefined || (a.days ?? 1e9) <= maxDays));
         return { total: rows.length, rows: rows.slice(0, 40).map((a) => ({
@@ -60,53 +63,72 @@ export function ldmsTools() {
     }),
 
     get_record: tool({
-      description: "Ambil detail satu dokumen berdasarkan ID: D0123 (izin), MLA-/ULA-/PKS-/PSM-001 (perjanjian), termasuk catatan tim Legal.",
+      description: "Ambil detail satu dokumen berdasarkan ID: D0123 (izin), MLA-/ULA-/PKS-001 (perjanjian), termasuk catatan tim Legal.",
       inputSchema: z.object({ id: z.string() }),
       execute: async ({ id }) => {
         const code = id.trim().toUpperCase();
         if (/^D\d{3,}$/.test(code)) {
+          if (!canView("permit")) return { error: "Tidak punya akses ke Permit & License." };
           const p = await getPermitByCode(code);
           if (!p) return { error: `Izin ${code} tidak ditemukan.` };
           return { ...p, catatan: (await listNotes("permit", p.id)).slice(0, 15).map((n) => ({ oleh: n.by_name, pada: n.created_at, isi: n.body })) };
         }
-        if (/^(MLA|ULA|PKS|PSM)-\d+$/.test(code)) {
+        if (/^(MLA|ULA|PKS)-\d+$/.test(code)) {
+          if (!canView("agreement")) return { error: "Tidak punya akses ke perjanjian." };
           const a = await getAgreementByCode(code);
           if (!a) return { error: `Perjanjian ${code} tidak ditemukan.` };
           return { ...a, catatan: (await listNotes("agreement", a.id)).slice(0, 15).map((n) => ({ oleh: n.by_name, pada: n.created_at, isi: n.body })) };
         }
-        return { error: "Gunakan tool lain untuk PNS/YRS/INS/LIB." };
+        return { error: "Gunakan tool lain untuk CASE/SGP/KB/INS/LIB." };
       },
     }),
 
-    matrix_lookup: tool({
-      description: "Cari baris Summary Matrix Disiplin berdasarkan kode (mis. KS-04) atau kata kunci perbuatan, dan sanksi baku per occurrence. Satu-satunya dasar jawaban sanksi.",
-      inputSchema: z.object({ code: z.string().optional(), q: z.string().optional(), occurrence: z.enum(["1st Occurrence", "Repeat", "Severe Case"]).optional() }),
-      execute: async ({ code, q, occurrence }) => {
-        if (code) {
-          const r = await getRule(code.toUpperCase());
-          if (!r) return { error: `Kode ${code} tidak ada di matrix.` };
-          return { ...r, sanksiUntukOccurrence: occurrence ? matrixSanksi(r, occurrence) : undefined };
-        }
-        const rows = (await listMatrix()).filter((m) => has([m.code, m.category, m.sub_category], q));
-        return { total: rows.length, rows: rows.slice(0, 15) };
+    search_cases: tool({
+      description: "Cari Cases (CASE-YYYY-NNN): sengketa komersial, pidana/laporan polisi, konsumen & regulator, ketenagakerjaan. Berisi kronologi, root cause, forum, status, keputusan, hasil, pelajaran.",
+      inputSchema: z.object({ q: z.string().optional(), status: z.enum(["aktif", "selesai", "semua"]).optional(), category: z.string().optional() }),
+      execute: async ({ q, status = "semua", category }) => {
+        const rows = (await listCases()).filter((c) => (!category || c.category.toLowerCase().includes(category.toLowerCase()))
+          && (status === "semua" || (status === "selesai" ? c.status === "selesai" : c.status !== "selesai"))
+          && has([c.code, c.title, c.category, c.unit_name, c.counterparty, c.forum, c.chronology, c.root_cause_cat, c.root_cause, c.decision, c.outcome, c.lesson], q));
+        return { total: rows.length, rows: rows.slice(0, 20).map((c) => ({
+          id: c.code, judul: c.title, kategori: c.category, unit: c.unit_name, forum: c.forum, pihakLawan: c.counterparty, risiko: c.risk, eksposur: c.exposure ? Number(c.exposure) : null,
+          status: CASE_STATUS[c.status], rootCause: [c.root_cause_cat, c.root_cause].filter(Boolean).join(" — "), keputusan: c.decision, hasil: c.outcome, pelajaran: c.lesson,
+          umurHari: c.age_days, picLegal: c.pic_name, kb: c.kb_code,
+        })) };
       },
     }),
 
-    search_punishments: tool({
-      description: "Cari pengajuan sanksi (PNS-YYYY-NNN): kode matrix, unit, status approval, keputusan final.",
-      inputSchema: z.object({ q: z.string().optional(), status: z.enum(["legal", "hr", "done", "returned"]).optional() }),
-      execute: async ({ q, status }) => {
-        const rows = (await listPunishments()).filter((p) => (!status || p.status === status) && has([p.code, p.matrix_code, p.sub_category, p.unit_name, p.submitter_fn, p.description], q));
-        return { total: rows.length, rows: rows.slice(0, 30).map((p) => ({ id: p.code, kode: p.matrix_code, sub: p.sub_category, unit: p.unit_name, occurrence: p.occurrence, sanksiBaku: p.matrix_std, usulan: p.proposed, verifikasiAI: p.ai_level, final: p.final, status: p.status, alasanPembeda: p.deviation_reason, banding: p.appeal, authority: p.authority })) };
+    case_flow: tool({
+      description: "Alur penanganan satu case (siapa menangani di tiap tahap) berdasarkan ID CASE-YYYY-NNN.",
+      inputSchema: z.object({ id: z.string() }),
+      execute: async ({ id }) => {
+        const c = (await listCases()).find((x) => x.code.toUpperCase() === id.trim().toUpperCase());
+        if (!c) return { error: `Case ${id} tidak ditemukan.` };
+        return { id: c.code, alur: (await listSteps(c.id)).map((s) => ({ tanggal: s.step_date, tahap: s.stage, penangan: s.handler, tindakan: s.action })) };
+      },
+    }),
+
+    case_insight: tool({
+      description: "Statistik Cases & SIGAP: jumlah per kategori, root cause paling sering, distribusi hasil, rata-rata hari penyelesaian, eksposur case aktif.",
+      inputSchema: z.object({}),
+      execute: async () => caseInsight(),
+    }),
+
+    search_sigap: tool({
+      description: "Cari hasil SIGAP (SGP-YYYY-NNN): pelanggaran disiplin, keputusan/sanksi, root cause, pelajaran. Tanpa nama karyawan.",
+      inputSchema: z.object({ q: z.string().optional() }),
+      execute: async ({ q }) => {
+        const rows = (await listSigap()).filter((s) => has([s.code, s.violation, s.category, s.unit_name, s.decision, s.root_cause, s.lesson], q));
+        return { total: rows.length, rows: rows.slice(0, 20).map((s) => ({ id: s.code, tanggal: s.result_date, unit: s.unit_name, kategori: s.category, pelanggaran: s.violation, keputusan: s.decision, rootCause: s.root_cause, pelajaran: s.lesson })) };
       },
     }),
 
     search_kb: tool({
-      description: "Cari Knowledge Base yurisprudensi (YRS-YYYY-NNN): kronologi, langkah investigasi, pertimbangan. Hanya ilustrasi pembuktian, bukan dasar tingkat sanksi.",
+      description: "Cari Knowledge Base (KB-…): pelajaran dari case & SIGAP — kategori, root cause, alur penanganan, keputusan, hasil, pelajaran.",
       inputSchema: z.object({ q: z.string() }),
       execute: async ({ q }) => {
-        const rows = (await listKb()).filter((k) => has([k.code, k.title, k.unit_label, k.matrix_code, k.category, k.summary, k.chronology, k.investigation, k.reasoning], q));
-        return { total: rows.length, rows: rows.slice(0, 8).map((k) => ({ id: k.code, judul: k.title, unit: k.unit_label, kode: k.matrix_code, sanksi: k.sanction, ringkasan: k.summary, langkahInvestigasi: k.investigation, pertimbangan: k.reasoning })) };
+        const rows = (await listKb()).filter((k) => has([k.code, k.title, k.unit_label, k.category, k.summary, k.root_cause, k.investigation, k.sanction, k.outcome, k.lesson], q));
+        return { total: rows.length, rows: rows.slice(0, 10).map((k) => ({ id: k.code, judul: k.title, unit: k.unit_label, kategori: k.category, rootCause: k.root_cause, alur: k.investigation, keputusan: k.sanction, hasil: k.outcome, pelajaran: k.lesson })) };
       },
     }),
 
@@ -120,7 +142,7 @@ export function ldmsTools() {
     }),
 
     search_library: tool({
-      description: "Cari Library: PKS, PSM, License, Legal Opinion, Resume (LIB-…).",
+      description: "Cari Repository: Legal Opinion, memo hukum, resume (LIB-…).",
       inputSchema: z.object({ q: z.string().optional(), kind: z.string().optional() }),
       execute: async ({ q, kind }) => {
         const rows = (await listLibrary()).filter((l) => (!kind || l.kind === kind) && has([l.code, l.kind, l.title, l.parties, l.core, l.key_points, l.outcome], q));
@@ -159,14 +181,23 @@ export function ldmsTools() {
       },
     }),
   };
+  const need: Record<keyof typeof all, Module | null> = {
+    search_permits: "permit", search_agreements: "agreement", get_record: null, search_cases: "cases", case_flow: "cases", case_insight: "cases",
+    search_sigap: "sigap", search_kb: "kb", search_inspections: "inspection", search_library: "library", search_drive: "library", aggregate: "permit",
+  };
+  return Object.fromEntries(Object.entries(all).filter(([k]) => {
+    const m = need[k as keyof typeof all];
+    return k === "get_record" ? canView("permit") || canView("agreement") : !m || canView(m);
+  })) as Partial<typeof all>;
 }
 
-export const CHAT_SYSTEM = (name: string, today: string) => `Anda asisten pencarian internal LDMS (Legal Document Management System) Boga Group untuk tim Legal. Pengguna: ${name}. Hari ini ${today} (WIB).
+
+export const CHAT_SYSTEM = (name: string, today: string) => `Anda asisten pencarian internal LDMS (Legal Document Management System) Boga Group. Pengguna: ${name}. Hari ini ${today} (WIB).
 Gunakan tools untuk mengambil data — jangan menebak. Repository Google Drive tim Legal bisa dicari dengan search_drive.
 Jawab HANYA dari data yang dikembalikan tools. Bila datanya tidak ada, katakan terus terang bahwa data itu belum terekam di LDMS — jangan mengarang nomor izin, id dokumen, tanggal, atau nilai.
-Selalu sebutkan id/nomor dokumen yang relevan (D0123, ULA-004, PKS-002, PNS-2026-001, YRS-2025-013, INS-2025-018, LIB-LO-005) agar tim Legal bisa membukanya; untuk dokumen Drive sebut nama filenya.
+Selalu sebutkan id/nomor dokumen yang relevan (D0123, ULA-004, PKS-002, CASE-2026-002, SGP-2026-001, KB-CASE-2025-004, INS-2025-018, LIB-LO-005) agar bisa dibuka; untuk dokumen Drive sebut nama filenya.
 Jawaban singkat dan langsung: 1-4 kalimat atau daftar pendek maksimal 8 baris. Bahasa Indonesia. Sebut angka apa adanya dari data.
 Jangan pakai markdown heading atau tabel; boleh daftar dengan tanda hubung.
 Bila pertanyaan menyangkut tenggat, sebutkan sisa hari dan tanggal jatuh temponya sekaligus.
-Untuk pertanyaan sanksi, jawab dari matrix_lookup: sebut kode, kolom occurrence, sanksinya, hak banding, dan line of authority. Jangan menyimpulkan sanksi dari kasus lampau.
+Bila tool untuk suatu modul tidak tersedia, katakan bahwa pengguna tidak punya akses ke modul itu.
 Jangan menyebut nama atau identitas karyawan yang melanggar.`;

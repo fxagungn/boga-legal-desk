@@ -1,14 +1,18 @@
-// Knowledge Base, Government Inspection, Library (blueprint §9–11).
+// Knowledge Base, Government Inspection, Repository (Legal Opinion).
 import { query } from "../db";
 
 export interface KbCase {
   id: number; code: string; case_date: string | null; title: string; unit_label: string | null; brand: string | null; matrix_code: string | null;
   category: string | null; location: string | null; investigation: string | null; functions: string | null; decider: string | null;
   sanction: string | null; summary: string | null; chronology: string | null; reasoning: string | null; source: string; synced_at: string | null; is_demo: boolean;
+  root_cause: string | null; outcome: string | null; lesson: string | null; case_code: string | null; sigap_code: string | null;
 }
 export const listKb = () => query<KbCase>(
-  `select id, code, to_char(case_date,'YYYY-MM-DD') as case_date, title, unit_label, brand, matrix_code, category, location, investigation, functions, decider,
-     sanction, summary, chronology, reasoning, source, synced_at, is_demo from kb_cases order by code desc`,
+  `select k.id, k.code, to_char(k.case_date,'YYYY-MM-DD') as case_date, k.title, k.unit_label, k.brand, k.matrix_code, k.category, k.location, k.investigation,
+     k.functions, k.decider, k.sanction, k.summary, k.chronology, k.reasoning, k.source, k.synced_at, k.is_demo, k.root_cause, k.outcome, k.lesson,
+     c.code as case_code, s.code as sigap_code
+   from kb_cases k left join cases c on c.id = k.case_id left join sigap_results s on s.id = k.sigap_id
+   order by k.case_date desc nulls last, k.code desc`,
 );
 
 export const INSPECTION_RESULTS = ["Sesuai", "Temuan minor", "Temuan mayor", "Sanksi administratif"] as const;
@@ -27,13 +31,13 @@ export const listInspections = () => query<InspectionRow>(
    from inspections i left join units u on u.id = i.unit_id left join team_members m on m.id = i.pic_id order by i.insp_date desc`,
 );
 
-export const LIBRARY_KINDS = ["PSM", "PKS", "License", "Legal Opinion", "Resume"] as const;
+export const LIBRARY_KINDS = ["Legal Opinion", "Memo hukum", "Resume"] as const;
 export interface LibraryRow { id: number; code: string; kind: string; doc_date: string | null; title: string; parties: string | null; core: string | null; key_points: string | null; outcome: string | null; file_url: string | null; is_demo: boolean }
 export const listLibrary = () => query<LibraryRow>(
   `select id, code, kind, to_char(doc_date,'YYYY-MM-DD') as doc_date, title, parties, core, key_points, outcome, file_url, is_demo from library order by doc_date desc nulls last, code`,
 );
 
-export const LIB_PREFIX: Record<string, string> = { PSM: "LIB-PSM", PKS: "LIB-PKS", License: "LIB-LA", "Legal Opinion": "LIB-LO", Resume: "LIB-RES" };
+export const LIB_PREFIX: Record<string, string> = { "Legal Opinion": "LIB-LO", "Memo hukum": "LIB-MM", Resume: "LIB-RES" };
 
 /* ---------- AI (blueprint §11.3, §15.3, §15.4) ---------- */
 
@@ -45,8 +49,8 @@ export interface AdviceResult {
 const GENERIC = `{"ringkasan":"3-5 kalimat","catatan":"peringatan bila record tidak cukup","keyakinan":"Tinggi|Sedang|Rendah","poin":["..."],"risiko":["..."],"referensi":[{"id":"LIB-…/INS-…","judul":"","kutipan":"verbatim","relevansi":0,"relevan":"1 kalimat"}],"langkah":["langkah konkret + penanggung jawab + tenggat"]}`;
 
 export const LIBRARY_SYSTEM = `Anda penasihat hukum internal Boga Group (F&B multi-brand, 150+ outlet, Indonesia).
-Dasar rekomendasi Anda HANYA: (a) LIBRARY perjanjian & legal opinion yang direkam perusahaan, (b) daftar agreement aktif, (c) acuan biaya perizinan per outlet, (d) dokumen repository Google Drive bila diberikan. Jangan mengarang id dokumen atau kutipan.
-Wajib menyitir id dokumen nyata dari library beserta kutipan verbatim dari field inti/poin.
+Dasar rekomendasi Anda HANYA: (a) Repository legal opinion & memo yang direkam perusahaan, (b) daftar agreement aktif (MLA, ULA, PKS), (c) Knowledge Base pelajaran dari case & SIGAP, (d) dokumen repository Google Drive bila diberikan. Jangan mengarang id dokumen atau kutipan.
+Wajib menyitir id dokumen nyata (LIB-…, KB-…, MLA/ULA/PKS-…) beserta kutipan verbatim dari field inti/poin/pelajaran.
 Bila record internal tidak memadai untuk isu ini, isi "catatan" dengan peringatan jujur dan turunkan keyakinan.
 Bahasa Indonesia formal-legal, ringkas, actionable. Status rekomendasi adalah draft untuk approval Legal Supervisor.
 Balas HANYA JSON valid dengan format: ${GENERIC}. "poin" = posisi dan klausul yang direkomendasikan. "risiko" = risiko bila permintaan pihak lawan diterima apa adanya.`;

@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { AlertTriangle, MessageSquareText, Paperclip } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { query } from "@/lib/db";
-import { currentMember, listMembers } from "@/lib/repo";
+import { listMembers } from "@/lib/repo";
+import { pageGuard } from "@/lib/guard";
 import {
-  daysText, inWindow, shortName, listBrands, listPermits, listPermitTypes, listUnits, needsAck, RENEWAL_LABEL, SCOPE_LABEL,
+  daysText, inWindow, listBrands, listPermits, listPermitTypes, listUnits, needsAck, RENEWAL_LABEL, SCOPE_LABEL,
   TIME_CHIP, timeStatus, type PermitRow,
 } from "@/lib/ldms/permits";
-import { formatDate } from "@/lib/time";
 import { cx, Empty, Notice } from "@/components/ui";
 import { FilterBar } from "@/components/permits/FilterBar";
 import { PermitDrawer } from "@/components/permits/PermitDrawer";
@@ -38,7 +38,7 @@ function matchQuick(p: PermitRow, t: string) {
 
 export default async function Perizinan({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams;
-  const me = (await currentMember())!;
+  const { me, can } = await pageGuard("permit");
   const [all, brands, units, types, members] = await Promise.all([listPermits(), listBrands(), listUnits(), listPermitTypes(), listMembers(true)]);
 
   // Staff see their own documents by default (blueprint: Legal2 = dokumen sendiri); everyone can switch to "Semua PIC".
@@ -77,7 +77,7 @@ export default async function Perizinan({ searchParams }: { searchParams: Promis
 
   return (
     <div>
-      {isDemo && <div className="mb-4"><Notice tone="info">Sebagian registry masih <b>data contoh</b> (outlet asli Boga Group, nomor & tanggal izin fiktif). Data asli diimpor Super Admin di Admin Console → Master data → Impor registry izin.</Notice></div>}
+      {isDemo && <div className="mb-3"><Notice tone="info">Berisi <b>data contoh</b>.</Notice></div>}
 
       <div className="mb-3.5 flex flex-wrap items-center gap-3">
         <nav className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-1" aria-label="Filter cepat">
@@ -92,7 +92,7 @@ export default async function Perizinan({ searchParams }: { searchParams: Promis
             );
           })}
         </nav>
-        <PermitForm units={units} types={types} members={members} me={me} />
+        {can("permit", "edit") && <PermitForm units={units} types={types} members={members} me={me} />}
       </div>
 
       <section className="card overflow-hidden">
@@ -129,58 +129,17 @@ export default async function Perizinan({ searchParams }: { searchParams: Promis
           <Empty title="Tidak ada dokumen yang cocok">Coba ubah filter atau kata kunci.{pic === "me" && <> Anda sedang melihat dokumen milik Anda saja — <Link className="font-semibold text-brand" href={href({ pic: "all" })}>lihat semua PIC</Link>.</>}</Empty>
         ) : (
           <>
-            <table className="hidden w-full text-left text-[13px] lg:table">
-              <thead className="border-b border-line bg-[#fafbfc] text-[11px] font-bold tracking-[0.6px] whitespace-nowrap text-ink-3 uppercase">
-                <tr>
-                  <th className="px-5 py-2.5 font-bold">Dokumen</th>
-                  <th className="px-3 py-2.5 font-bold">Outlet / Brand</th>
-                  <th className="px-3 py-2.5 font-bold">PIC Legal</th>
-                  <th className="px-3 py-2.5 font-bold">Expiry</th>
-                  <th className="px-3 py-2.5 font-bold">Sisa</th>
-                  <th className="px-3 py-2.5 font-bold">Renewal</th>
-                  <th className="px-3 py-2.5"><span className="sr-only">Info</span></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line-2">
-                {rows.map((p) => (
-                  <tr key={p.id} className={cx("group relative hover:bg-[#fafbfc]", sp.d === p.code && "bg-brand-subtle")}>
-                    <td className="px-5 py-3">
-                      <Link href={href({ d: p.code })} scroll={false} className="font-bold text-ink after:absolute after:inset-0 group-hover:text-brand hover:no-underline">{p.type_name}</Link>
-                      <div className="font-mono text-[10.5px] text-ink-3">{p.number ?? "tanpa nomor"} · {p.code}</div>
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="font-semibold">{p.unit_name}</div>
-                      <div className="text-[11.5px] text-ink-3">{p.brand ?? SCOPE_LABEL[p.scope]}{p.city ? ` · ${p.city}` : ""}</div>
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className={cx("font-medium", p.pic_id === me.id && "text-brand")}>{shortName(p.pic_name)}</div>
-                    </td>
-                    <td className="px-3 py-3 font-mono text-[12px] whitespace-nowrap">{p.expiry_date ? formatDate(p.expiry_date) : "—"}</td>
-                    <td className="px-3 py-3"><span className={cx("inline-block rounded-md px-2 py-[3px] font-mono text-[11px] font-semibold whitespace-nowrap", TIME_CHIP[timeStatus(p.days)])}>{daysText(p.days)}</span></td>
-                    <td className="px-3 py-3"><RenewalCell p={p} /></td>
-                    <td className="px-3 py-3"><Icons p={p} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <ul className="divide-y divide-line-2 lg:hidden">
+            <ul className="divide-y divide-line-2">
               {rows.map((p) => (
                 <li key={p.id}>
-                  <Link href={href({ d: p.code })} scroll={false} className="flex items-start gap-3 px-4 py-3.5 hover:no-underline active:bg-bg">
+                  <Link href={href({ d: p.code })} scroll={false} className={cx("flex items-center gap-3 px-4 py-3 hover:bg-[#fafbfc] hover:no-underline md:px-5", sp.d === p.code && "bg-brand-subtle")}>
                     <div className="min-w-0 flex-1">
-                      <div className="font-bold leading-snug text-ink">{p.type_name}</div>
-                      <div className="mt-0.5 text-[12.5px] text-ink-2">{p.unit_name}</div>
-                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                        <RenewalCell p={p} />
-                        <Icons p={p} />
-                        <span className="text-[12px] text-ink-3">{shortName(p.pic_name)}</span>
-                      </div>
+                      <div className="truncate font-bold text-ink">{p.type_name}</div>
+                      <div className="truncate text-[12.5px] text-ink-3">{p.unit_name}</div>
                     </div>
-                    <div className="text-right">
-                      <span className={cx("inline-block rounded-md px-2 py-[3px] font-mono text-[11px] font-semibold whitespace-nowrap", TIME_CHIP[timeStatus(p.days)])}>{daysText(p.days)}</span>
-                      <div className="mt-1 font-mono text-[11px] text-ink-3">{p.expiry_date ? formatDate(p.expiry_date) : ""}</div>
-                    </div>
+                    {needsAck(p) && <span title="Somasi belum acknowledge" className="chip h-6 shrink-0 bg-brand px-1.5 text-white"><AlertTriangle size={13} /><span className="hidden sm:inline">Somasi</span></span>}
+                    <span className="hidden w-[110px] shrink-0 text-right text-[12.5px] md:block"><RenewalCell p={p} /></span>
+                    <span className={cx("inline-block w-[92px] shrink-0 rounded-md px-2 py-[3px] text-center font-mono text-[11px] font-semibold whitespace-nowrap", TIME_CHIP[timeStatus(p.days)])}>{daysText(p.days)}</span>
                   </Link>
                 </li>
               ))}
@@ -195,22 +154,7 @@ export default async function Perizinan({ searchParams }: { searchParams: Promis
 }
 
 function RenewalCell({ p }: { p: PermitRow }) {
-  if (!inWindow(p) && p.renewal_status === "belum") return <span className="text-[12.5px] text-ink-3">Aktif</span>;
+  if (!inWindow(p) && p.renewal_status === "belum") return <span className="text-ink-3">Aktif</span>;
   const tone = p.renewal_status === "submitted" ? "text-info" : p.renewal_status === "proses" ? "text-ink" : "text-brand";
-  return <span className={cx("text-[13px] font-semibold", tone)}>{RENEWAL_LABEL[p.renewal_status]}</span>;
+  return <span className={cx("font-semibold", tone)}>{RENEWAL_LABEL[p.renewal_status]}</span>;
 }
-
-function Icons({ p }: { p: PermitRow }) {
-  return (
-    <span className="relative z-10 flex items-center gap-2 text-ink-3">
-      {p.requires_ack && (
-        <span title={needsAck(p) ? "Bersomasi — belum acknowledge" : "Bersomasi — sudah acknowledge"} className={cx("chip h-6 px-1.5", needsAck(p) ? "bg-brand text-white" : "bg-brand-subtle text-brand")}>
-          <AlertTriangle size={13} /> Somasi
-        </span>
-      )}
-      {p.note_count > 0 && <span title={`${p.note_count} catatan`} className="flex items-center gap-0.5 text-[12px]"><MessageSquareText size={14} />{p.note_count}</span>}
-      {p.file_count > 0 && <span title={`${p.file_count} file`} className="flex items-center gap-0.5 text-[12px]"><Paperclip size={14} />{p.file_count}</span>}
-    </span>
-  );
-}
-

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Gavel, LayoutDashboard, Menu, ShieldCheck, X } from "lucide-react";
+import { FolderKanban, LayoutDashboard, Menu, ShieldCheck, X } from "lucide-react";
 import { isActive, NAV, NAV_ITEMS, navFor } from "@/lib/nav";
 import { cx } from "./ui";
 
@@ -13,9 +13,9 @@ export function SideNav({ badges = {}, allowed, onNavigate }: { badges?: Record<
     <nav aria-label="Menu utama" className="flex flex-col gap-0.5">
       {NAV.map((g) => g.items.some((it) => allowed.includes(it.href)) && (
         <div key={g.label} className="mb-1.5">
-          <p className="mt-2 mb-1.5 px-2 text-[10.5px] font-bold tracking-[0.9px] text-ink-3 uppercase">{g.label}</p>
+          {g.label && <p className="mt-3 mb-1.5 px-2 text-[10.5px] font-bold tracking-[0.9px] text-ink-3 uppercase">{g.label}</p>}
           {g.items.filter((it) => allowed.includes(it.href)).map((it) => {
-            const num = g.label === "Lainnya" ? "··" : String(++n).padStart(2, "0");
+            const num = g.label === "Admin Console" ? "··" : String(++n).padStart(2, "0");
             const on = isActive(path, it.href);
             const b = badges[it.href];
             return (
@@ -43,10 +43,9 @@ export function TopBar({ name, title, initials }: { name: string; title: string;
   const it = navFor(path);
   const today = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date());
   return (
-    <header className="hidden items-center justify-between gap-6 border-b border-line bg-surface px-7 py-[18px] md:flex">
+    <header className="hidden items-center justify-between gap-6 border-b border-line bg-surface px-7 py-4 md:flex">
       <div className="min-w-0">
         <h1 className="text-[19px] font-extrabold tracking-[-0.35px]">{it?.title ?? "Legal DMS"}</h1>
-        {it?.sub && <p className="mt-[3px] text-[12.5px] font-medium text-ink-3">{it.sub}</p>}
       </div>
       <div className="flex shrink-0 items-center gap-4">
         <div className="text-right">
@@ -72,11 +71,11 @@ export function MobileNav({ badges = {}, allowed, footer }: { badges?: Record<st
   const [open, setOpen] = useState(false);
   useEffect(() => setOpen(false), [path]);
   const it = navFor(path);
-  const tabs = [
+  const tabs = ([
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/perizinan", label: "Registry", icon: ShieldCheck },
-    { href: "/sanksi", label: "Sanksi", icon: Gavel },
-  ];
+    { href: "/cases", label: "Cases", icon: FolderKanban },
+  ]).filter((t) => allowed.includes(t.href));
   return (
     <>
       <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-surface/95 px-4 py-3 backdrop-blur md:hidden">
@@ -102,19 +101,19 @@ export function MobileNav({ badges = {}, allowed, footer }: { badges?: Record<st
         </div>
       )}
 
-      <nav aria-label="Navigasi bawah" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+      <nav aria-label="Navigasi bawah" className="fixed inset-x-0 bottom-0 z-40 flex border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
         {tabs.map(({ href, label, icon: Icon }) => {
           const on = isActive(path, href);
           const n = badges[href]?.hot ? badges[href]?.n : 0;
           return (
-            <Link key={href} href={href} className={cx("relative flex flex-col items-center gap-0.5 py-2 text-[11.5px] font-semibold", on ? "text-brand" : "text-ink-3")}>
+            <Link key={href} href={href} className={cx("relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[11.5px] font-semibold", on ? "text-brand" : "text-ink-3")}>
               <Icon size={21} strokeWidth={on ? 2.4 : 2} />
               {label}
               {n ? <span className="absolute top-1 left-1/2 ml-2 rounded-full bg-brand px-1 font-mono text-[10px] leading-4 font-bold text-white">{n}</span> : null}
             </Link>
           );
         })}
-        <button type="button" onClick={() => setOpen(true)} className={cx("flex flex-col items-center gap-0.5 py-2 text-[11.5px] font-semibold", !tabs.some((t) => isActive(path, t.href)) && NAV_ITEMS.some((i) => isActive(path, i.href)) ? "text-brand" : "text-ink-3")}>
+        <button type="button" onClick={() => setOpen(true)} className={cx("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11.5px] font-semibold", !tabs.some((t) => isActive(path, t.href)) && NAV_ITEMS.some((i) => isActive(path, i.href)) ? "text-brand" : "text-ink-3")}>
           <Menu size={21} />
           Lainnya
         </button>

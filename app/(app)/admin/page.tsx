@@ -253,7 +253,7 @@ async function MasterTab() {
                 <input name="name" defaultValue={b?.name ?? ""} placeholder="Brand baru" aria-label="Nama brand" className="input h-9" />
                 <label className="flex items-center gap-1.5 text-[12.5px]"><input type="checkbox" name="has_principal" defaultChecked={b?.has_principal} className="accent-[#c41e29]" /> Berprincipal</label>
                 <input name="principal_name" defaultValue={b?.principal_name ?? ""} placeholder="Nama principal" aria-label="Principal" className="input h-9" />
-                <select name="currency" defaultValue={b?.currency ?? "IDR"} aria-label="Mata uang ULA" className="input h-9 w-auto">{["IDR", "USD", "SGD"].map((c) => <option key={c}>{c}</option>)}</select>
+                <select name="currency" defaultValue={b?.currency ?? "IDR"} aria-label="Mata uang ULA" className="input h-9 w-auto">{["IDR", "USD", "SGD", "JPY"].map((c) => <option key={c}>{c}</option>)}</select>
                 <label className="flex items-center gap-1.5 text-[12.5px]"><input type="checkbox" name="active" defaultChecked={b?.active ?? true} className="accent-[#c41e29]" /> Aktif</label>
                 <Submit className="btn btn-sm">{b ? "Simpan" : "Tambah"}</Submit>
               </ActionForm>

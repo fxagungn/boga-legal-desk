@@ -7,6 +7,8 @@ export interface NavItem {
   title: string;
   module?: Module;
   superAdmin?: boolean;
+  /** Small status chip next to the label. */
+  note?: string;
 }
 
 export const NAV: { label: string; items: NavItem[] }[] = [
@@ -18,7 +20,7 @@ export const NAV: { label: string; items: NavItem[] }[] = [
     { href: "/perjanjian", label: "MLA · ULA · PKS", title: "MLA · ULA · PKS", module: "agreement" },
     { href: "/pemeriksaan", label: "Government Inspection", title: "Government Inspection", module: "inspection" },
     { href: "/cases", label: "Cases", title: "Cases", module: "cases" },
-    { href: "/sigap", label: "SIGAP", title: "SIGAP", module: "sigap" },
+    { href: "/sigap", label: "SIGAP", title: "SIGAP", module: "sigap", note: "On progress" },
   ] },
   { label: "Repository", items: [
     { href: "/repository", label: "Legal Opinion", title: "Repository · Legal Opinion", module: "library" },

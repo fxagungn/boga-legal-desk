@@ -10,23 +10,20 @@ import { initials } from "@/lib/format";
 import { NAV_ITEMS } from "@/lib/nav";
 import { can, getAccessCtx, isSuperAdmin } from "@/lib/access";
 import { ChatWidget } from "@/components/chat/ChatWidget";
+import { NavProgress } from "@/components/NavProgress";
 
 export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const me = await currentMember();
+  const [me, settings, access] = await Promise.all([currentMember(), getSettings(), getAccessCtx()]);
   if (!me) redirect("/login");
   if (me.must_change_password) redirect("/ganti-password");
-  const settings = await getSettings();
   // Sidebar badge: my permits that need action (in renewal window, or somasi not yet acknowledged).
-  const access = await getAccessCtx();
-  const permitOk = can(access, me, "permit", "view");
-  const [mine, total] = !permitOk ? [[], []] : await Promise.all([query<{ n: number }>(
+  const mine = !can(access, me, "permit", "view") ? [] : await query<{ n: number }>(
     `select count(*)::int as n from permits p join permit_types t on t.id = p.permit_type_id join units u on u.id = p.unit_id
      where u.status = 'aktif' and p.pic_id = $1 and ((p.expiry_date - (now() at time zone 'Asia/Jakarta')::date) <= t.lead_days or (p.requires_ack and p.ack_at is null))`,
     [me.id],
-  ), query<{ n: number }>(`select count(*)::int as n from permits p join units u on u.id = p.unit_id where u.status = 'aktif'`)]);
-  void total;
+  );
   const badges = { "/perizinan": { n: mine[0]?.n || 0, hot: true } };
   const superAdmin = isSuperAdmin(me);
   const allowed = NAV_ITEMS.filter((i) => (i.superAdmin ? superAdmin : !i.module || can(access, me, i.module, "view"))).map((i) => i.href);
@@ -101,6 +98,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </main>
       </div>
       {chatOk && <ChatWidget name={me.name} />}
+      <NavProgress />
       <Toaster />
     </div>
   );

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { one, query } from "./db";
 import { SESSION_COOKIE, verifySession } from "./auth";
@@ -30,14 +31,14 @@ export async function getMember(id: number) {
   return one<Member>(`select id, name, role, email, whatsapp, active, title, nik, must_change_password, password_hash is not null as has_password, last_login_at, is_super_admin, grade, dept, division from team_members where id = $1`, [id]);
 }
 
-/** The currently signed-in member, or null. */
-export async function currentMember(): Promise<Member | null> {
+/** The currently signed-in member, or null. Looked up once per request (layout, guards and pages share it). */
+export const currentMember = cache(async (): Promise<Member | null> => {
   const jar = await cookies();
   const s = await verifySession(jar.get(SESSION_COOKIE)?.value);
   if (!s) return null;
   const m = await getMember(s.m);
   return m && m.active ? m : null;
-}
+});
 
 export const canBypassMaintenance = (m: Member) => ["manager", "agm", "admin"].includes(m.role) || Boolean(m.is_super_admin);
 

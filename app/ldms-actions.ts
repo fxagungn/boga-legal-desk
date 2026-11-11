@@ -253,3 +253,12 @@ export async function logDecision(module: string, input: unknown, output: unknow
   await logAi(me, module, input, output);
 }
 
+
+/** Rows for the dashboard search, fetched the first time the search box is used (only modules the user may view). */
+export async function searchRowsAction() {
+  const me = await requireMember();
+  const { can, getAccessCtx } = await import("@/lib/access");
+  const { searchRows } = await import("@/lib/ldms/search");
+  const a = await getAccessCtx();
+  return searchRows((m) => can(a, me, m, "view"));
+}

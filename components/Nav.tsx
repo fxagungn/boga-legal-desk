@@ -25,6 +25,7 @@ export function SideNav({ badges = {}, allowed, onNavigate }: { badges?: Record<
                   !on && "text-[#3a4048]")}>
                 <span className={cx("w-[18px] shrink-0 font-mono text-[11px]", on ? "text-brand" : "text-ink-3")}>{num}</span>
                 <span className="min-w-0 flex-1 leading-snug">{it.label}</span>
+                {it.note && <span className="rounded-[5px] bg-[#fff4e2] px-1.5 py-px text-[10px] font-bold whitespace-nowrap text-[#8a5a0b]">{it.note}</span>}
                 {b && b.n > 0 ? (
                   <span className={cx("rounded-[5px] px-1.5 py-px font-mono text-[10.5px] font-semibold", b.hot ? "bg-brand-soft text-brand" : "bg-mute-bg text-ink-2")}>{b.n}</span>
                 ) : null}
@@ -45,7 +46,7 @@ export function TopBar({ name, title, initials }: { name: string; title: string;
   return (
     <header className="hidden items-center justify-between gap-6 border-b border-line bg-surface px-7 py-4 md:flex">
       <div className="min-w-0">
-        <h1 className="text-[19px] font-extrabold tracking-[-0.35px]">{it?.title ?? "Legal DMS"}</h1>
+        <h1 className="flex items-center gap-2.5 text-[19px] font-extrabold tracking-[-0.35px]">{it?.title ?? "Legal DMS"}{it?.note && <span className="rounded-md bg-[#fff4e2] px-2 py-0.5 text-[11px] font-bold tracking-normal text-[#8a5a0b]">{it.note}</span>}</h1>
       </div>
       <div className="flex shrink-0 items-center gap-4">
         <div className="text-right">

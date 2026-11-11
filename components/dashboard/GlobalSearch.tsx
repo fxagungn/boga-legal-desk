@@ -1,8 +1,9 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { cx } from "@/components/ui";
-import { Search } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
+import { searchRowsAction } from "@/app/ldms-actions";
 import type { SearchRow } from "@/lib/ldms/search";
 
 const MODULES = ["Semua modul", "Permit", "Perjanjian", "Pemeriksaan", "Cases", "SIGAP", "Repository", "Knowledge Base"] as const;
@@ -34,14 +35,22 @@ function chip(d: number | null) {
 }
 
 /** Dashboard search across every LDMS module (blueprint §12.1). Most urgent first, max 60. */
-export function GlobalSearch({ rows }: { rows: SearchRow[] }) {
+export function GlobalSearch() {
+  // Rows are loaded on first use, so opening the dashboard does not read every module.
+  const [rows, setRows] = useState<SearchRow[] | null>(null);
+  const asked = useRef(false);
+  const load = () => {
+    if (asked.current) return;
+    asked.current = true;
+    searchRowsAction().then(setRows).catch(() => { asked.current = false; });
+  };
   const [q, setQ] = useState("");
   const [modul, setModul] = useState<(typeof MODULES)[number]>("Semua modul");
   const [status, setStatus] = useState<Status>("Semua status");
 
   const hits = useMemo(() => {
     const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    return rows
+    return (rows ?? [])
       .filter((r) => modul === "Semua modul" || r.module === modul)
       .filter((r) => match(r, status))
       .filter((r) => { const t = r.text.toLowerCase(); return words.every((w) => t.includes(w)); })
@@ -50,26 +59,28 @@ export function GlobalSearch({ rows }: { rows: SearchRow[] }) {
 
   const shown = hits.slice(0, 60);
   const active = q.trim() !== "" || modul !== "Semua modul" || status !== "Semua status";
-  const mods = MODULES.filter((m) => m === "Semua modul" || rows.some((r) => r.module === m));
+  const mods = MODULES.filter((m) => m === "Semua modul" || !rows || rows.some((r) => r.module === m));
   return (
     <section className="card overflow-hidden">
       <div className="flex flex-col gap-2 p-3.5 sm:flex-row sm:items-center">
         <label className="relative flex-1">
           <span className="sr-only">Cari</span>
           <Search size={17} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
-          <input id="gsearch" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari di semua modul…" className="input h-10 pl-9 text-[14px]" />
+          <input id="gsearch" value={q} onFocus={load} onChange={(e) => { load(); setQ(e.target.value); }} placeholder="Cari di semua modul…" className="input h-10 pl-9 text-[14px]" />
         </label>
         <div className="flex gap-2">
-          <select aria-label="Modul" value={modul} onChange={(e) => setModul(e.target.value as (typeof MODULES)[number])} className="input h-10 w-auto text-[13px]">
+          <select aria-label="Modul" value={modul} onFocus={load} onChange={(e) => setModul(e.target.value as (typeof MODULES)[number])} className="input h-10 w-auto text-[13px]">
             {mods.map((m) => <option key={m}>{m}</option>)}
           </select>
-          <select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value as Status)} className="input h-10 w-auto text-[13px]">
+          <select aria-label="Status" value={status} onFocus={load} onChange={(e) => setStatus(e.target.value as Status)} className="input h-10 w-auto text-[13px]">
             {STATUS.map((s) => <option key={s}>{s}</option>)}
           </select>
         </div>
-        {active && <span className="font-mono text-[12px] whitespace-nowrap text-ink-3" aria-live="polite">{hits.length > 60 ? "60+ hasil" : `${hits.length} hasil`}</span>}
+        {active && rows && <span className="font-mono text-[12px] whitespace-nowrap text-ink-3" aria-live="polite">{hits.length > 60 ? "60+ hasil" : `${hits.length} hasil`}</span>}
       </div>
-      {!active ? null : shown.length === 0 ? (
+      {!active ? null : !rows ? (
+        <p className="flex items-center justify-center gap-2 border-t border-line-2 px-5 py-8 text-[13.5px] text-ink-2"><Loader2 size={15} className="animate-spin" /> Mencari…</p>
+      ) : shown.length === 0 ? (
         <p className="border-t border-line-2 px-5 py-8 text-center text-[13.5px] text-ink-2">Tidak ada yang cocok.</p>
       ) : (
         <ul className="max-h-[330px] divide-y divide-line-2 overflow-y-auto border-t border-line-2">

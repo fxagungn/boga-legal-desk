@@ -82,3 +82,8 @@ dialog[open] { animation: pop .14s ease-out; }
 @keyframes slidein { from { transform: translateX(24px); opacity: .4; } to { transform: none; opacity: 1; } }
 .drawer-panel { animation: slidein .18s ease-out; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* Page-loading bar (components/NavProgress.tsx) */
+@keyframes nav-progress { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+.nav-progress { animation: nav-progress 1s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .nav-progress { animation: none; width: 100%; opacity: 0.6; } }

@@ -22,7 +22,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
   return (
     <div className="space-y-4">
       <nav className="flex gap-1 border-b border-line" aria-label="SIGAP">
-        {([["sistem", "Sistem SIGAP"], ["hasil", `Hasil → Knowledge Base (${rows.length})`]] as const).map(([k, l]) => (
+        {([["sistem", "Sistem SIGAP · on progress"], ["hasil", `Hasil → Knowledge Base (${rows.length})`]] as const).map(([k, l]) => (
           <Link key={k} href={k === "sistem" ? "/sigap" : "/sigap?tab=hasil"} aria-current={tab === k ? "page" : undefined}
             className={cx("-mb-px border-b-2 px-3 pb-2.5 text-[13.5px] font-semibold hover:no-underline", tab === k ? "border-brand text-brand" : "border-transparent text-ink-2 hover:text-ink")}>{l}</Link>
         ))}
@@ -32,7 +32,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
         <section className="card grid place-items-center px-6 py-16 text-center">
           <span className="grid h-12 w-12 place-items-center rounded-xl bg-mute-bg text-ink-3"><Unplug size={22} /></span>
           <p className="mt-3 text-[15px] font-bold">SIGAP belum tersambung</p>
-          <p className="mt-1 text-[13px] text-ink-2">Sistem SIGAP akan tampil di sini.</p>
+          <p className="mt-1 text-[13px] text-ink-2">Integrasi sedang dikerjakan (on progress). Sistem SIGAP akan tampil di sini.</p>
           <div className="mt-4 flex gap-2">
             {superAdmin && <Link href="/admin?tab=alur" className="btn btn-primary btn-sm">Sambungkan</Link>}
             <Link href="/sigap?tab=hasil" className="btn btn-sm">Lihat hasil</Link>

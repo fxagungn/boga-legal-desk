@@ -83,7 +83,7 @@ export function AgreementForm({ kind, a, members, me, brands, units, mlas }: {
         <div className="grid grid-cols-2 gap-3">
           <F id="ag-ccy" label="Mata uang">
             <select id="ag-ccy" name="currency" defaultValue={a?.currency ?? (k === "MLA" || k === "ULA" ? "USD" : "IDR")} className="input">
-              {["IDR", "USD", "SGD"].map((c) => <option key={c}>{c}</option>)}
+              {["IDR", "USD", "SGD", "JPY"].map((c) => <option key={c}>{c}</option>)}
             </select>
           </F>
           {k === "ULA"

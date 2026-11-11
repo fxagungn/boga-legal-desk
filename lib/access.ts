@@ -2,6 +2,7 @@
 //  1. Tim Legal — a role × module × action matrix.
 //  2. Cohort karyawan — any Boga employee matched by grade, department/brand, position keywords or an explicit NIK list
 //     gets the modules ticked for that cohort. Rights add up: a person gets everything any of their cohorts allows.
+import { cache } from "react";
 import { getKV, setKV } from "./db";
 import type { Member } from "./repo";
 import { ROLE_LABEL, type Role } from "./workflow";
@@ -118,10 +119,10 @@ export function isSuperAdmin(m: Pick<Member, "role" | "nik"> & { is_super_admin?
 
 export interface AccessCtx { matrix: AccessMatrix; cohorts: Cohort[] }
 
-export async function getAccessCtx(): Promise<AccessCtx> {
+export const getAccessCtx = cache(async (): Promise<AccessCtx> => {
   const [matrix, cohorts] = await Promise.all([getAccess(), getCohorts()]);
   return { matrix, cohorts };
-}
+});
 
 export function can(a: AccessCtx, me: Member & Person, module: Module, action: Action = "view"): boolean {
   if (isSuperAdmin(me)) return true;

@@ -243,25 +243,29 @@ export const DEFAULT_SETTINGS: AppSettings = {
 };
 
 export async function getSettings(): Promise<AppSettings> {
-  const row = await one<{ value: Partial<AppSettings> }>(`select value from app_settings where key = 'app'`);
-  const v = { ...DEFAULT_SETTINGS, ...(row?.value ?? {}) };
+  const v = { ...DEFAULT_SETTINGS, ...((await getKV<Partial<AppSettings>>("app")) ?? {}) };
   if (!Array.isArray(v.workflows) || v.workflows.length === 0) v.workflows = DEFAULT_WORKFLOWS;
   return v;
 }
 
 export async function saveSettings(patch: Partial<AppSettings>) {
   const next = { ...(await getSettings()), ...patch };
-  await query(
-    `insert into app_settings (key, value) values ('app', $1::jsonb)
-     on conflict (key) do update set value = excluded.value, updated_at = now()`,
-    [JSON.stringify(next)],
-  );
+  await setKV("app", next);
   return next;
 }
 
+// Settings (access matrix, cohorts, flows …) are read on every page. Keep them in memory for a few seconds per
+// server instance so a page load does not pay one database round trip per setting. Writes clear the entry at once.
+const KV_TTL = 15_000;
+const kvCache = new Map<string, { at: number; value: unknown }>();
+
 export async function getKV<T>(key: string): Promise<T | null> {
+  const hit = kvCache.get(key);
+  if (hit && Date.now() - hit.at < KV_TTL) return hit.value as T | null;
   const row = await one<{ value: T }>(`select value from app_settings where key = $1`, [key]);
-  return row?.value ?? null;
+  const value = row?.value ?? null;
+  kvCache.set(key, { at: Date.now(), value });
+  return value;
 }
 
 export async function setKV(key: string, value: unknown) {
@@ -270,6 +274,7 @@ export async function setKV(key: string, value: unknown) {
      on conflict (key) do update set value = excluded.value, updated_at = now()`,
     [key, JSON.stringify(value)],
   );
+  kvCache.delete(key);
 }
 
 /* ---------- seed ---------- */

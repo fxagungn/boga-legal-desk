@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { daysText, inWindow, listPermits, needsAck, RENEWAL_LABEL, TIME_CHIP, timeStatus, type PermitRow } from "@/lib/ldms/permits";
-import { searchRows } from "@/lib/ldms/search";
 import { listCases } from "@/lib/ldms/cases";
 import { can, getAccessCtx, isSuperAdmin } from "@/lib/access";
 import { currentMember } from "@/lib/repo";
@@ -26,8 +25,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   }
   const sp = await searchParams;
   const permitOk = canView("permit");
-  const [permits, search, cases] = await Promise.all([
-    permitOk ? listPermits() : Promise.resolve([] as PermitRow[]), searchRows(canView), canView("cases") ? listCases() : Promise.resolve([]),
+  const [permits, cases] = await Promise.all([
+    permitOk ? listPermits() : Promise.resolve([] as PermitRow[]), canView("cases") ? listCases() : Promise.resolve([]),
   ]);
   const openCases = cases.filter((c) => c.status !== "selesai");
 
@@ -64,7 +63,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   return (
     <div className="space-y-5">
       {sp.denied && <p className="rounded-xl border border-warn/20 bg-warn-bg px-4 py-2.5 text-[13px] text-warn">Anda tidak punya akses ke halaman itu.</p>}
-      <GlobalSearch rows={search} />
+      <GlobalSearch />
 
       {(permitOk || canView("cases")) && (
         <section className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="Ringkasan">

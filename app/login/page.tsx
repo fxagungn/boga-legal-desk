@@ -15,17 +15,17 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <span className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-[11px] bg-brand text-[17px] font-extrabold tracking-[-0.6px] text-white" aria-hidden="true">BG</span>
           <div>
             <h1 className="text-[20px] leading-tight font-extrabold tracking-[-0.4px]">Legal Document Management System</h1>
-            <p className="mt-0.5 text-[13px] font-medium text-ink-3">Boga Group · Permit, Agreement, Punishment &amp; Yurisprudensi</p>
+            <p className="mt-0.5 text-[13px] font-medium text-ink-3">Boga Group · Data Record · Repository · Knowledge Base</p>
           </div>
         </div>
         <div className="mt-[26px] rounded-[14px] border border-line bg-surface p-6">
           <h2 className="text-[13px] font-extrabold tracking-[-0.2px]">Masuk</h2>
-          <p className="mt-1 mb-5 text-[12px] leading-relaxed text-ink-3">Gunakan NIK karyawan Anda. Setiap input, perubahan status, catatan, dan approval tercatat atas nama akun yang dipakai — terlihat di audit trail.</p>
+          <p className="mt-1 mb-5 text-[12px] leading-relaxed text-ink-3">Gunakan NIK karyawan Anda.</p>
           {settings.maintenance && <p className="mb-4 rounded-lg bg-warn-bg px-3 py-2 text-[13px] text-warn">{settings.maintenanceMessage}</p>}
           {settings.uatMode && <p className="mb-4 rounded-lg bg-info-bg px-3 py-2 text-[13px] text-info">Mode UAT aktif: ini lingkungan uji coba.</p>}
           <LoginForm next={next} />
         </div>
-        <p className="mt-4 text-center text-[11.5px] leading-relaxed text-ink-3">Khusus tim Legal Boga Group. Lupa password atau akun terkunci? Hubungi Manager Legal untuk reset ke tanggal lahir.</p>
+        <p className="mt-4 text-center text-[11.5px] leading-relaxed text-ink-3">Lupa password atau belum punya akses? Hubungi tim Legal.</p>
       </div>
     </div>
   );

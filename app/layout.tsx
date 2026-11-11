@@ -11,7 +11,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Legal DMS — Boga Group",
-  description: "Legal Document Management System Boga Group — perizinan, perjanjian, sanksi, dan pengetahuan legal dalam satu tempat.",
+  description: "Legal Document Management System Boga Group — perizinan, perjanjian, case, dan pengetahuan legal dalam satu tempat.",
 };
 
 export const viewport: Viewport = { themeColor: "#ffffff", width: "device-width", initialScale: 1 };

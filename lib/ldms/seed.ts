@@ -10,7 +10,7 @@ const HYGIENE = "Menunggu jadwal pelatihan hygiene Dinas Kesehatan";
 /** [code, name, kind, scope, validity years, lead days, est. cost, agency, blocker] — LIST PERIZINAN (JATUH TEMPO) + blueprint §5.1 */
 export const PERMIT_TYPES: [string, string, "new" | "renewal", Scope, number, number, number | null, string, string | null][] = [
   ["NIB", "NIB / Izin Usaha", "renewal", "outlet", 5, 60, null, "OSS RBA — Kementerian Investasi/BKPM", null],
-  ["RKL", "Ijin Reklame", "renewal", "outlet", 1, 30, 7_500_000, "Dinas PM & PTSP / Bapenda setempat", null],
+  ["RKL", "Ijin Reklame", "renewal", "outlet", 1, 60, 7_500_000, "Dinas PM & PTSP / Bapenda setempat", null],
   ["HLL", "Sertifikat Halal", "renewal", "outlet", 4, 60, 3_500_000, "BPJPH — Kementerian Agama", null],
   ["SLS", "Sertifikat Laik Sehat", "renewal", "outlet", 3, 60, 2_500_000, DINKES, HYGIENE],
   ["HPJ", "Sertifikat Pelatihan Hygiene Penanggung Jawab", "renewal", "outlet", 3, 60, 1_200_000, DINKES, HYGIENE],

@@ -36,6 +36,9 @@ export async function GET(req: NextRequest) {
     await step("driveIndex", () => drive.indexDrive());
     await step("driveMirror", () => drive.mirrorToDrive());
   }
+  const { purgeOldFiles } = await import("@/lib/ldms/retention");
+  await step("fileRetention", () => purgeOldFiles());
+
   await setKV("last_daily", { at: new Date().toISOString() });
   return NextResponse.json(out);
 }

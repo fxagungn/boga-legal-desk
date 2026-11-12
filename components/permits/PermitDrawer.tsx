@@ -186,6 +186,7 @@ export async function PermitDrawer({ code, me, closeHref }: { code: string; me: 
                 <Submit className="btn btn-sm" pending="Mengunggah…"><Paperclip size={14} /> Unggah</Submit>
               </ActionForm>
             ) : files.length === 0 && <p className="text-[13.5px] text-ink-3">Belum ada file.</p>}
+            <p className="mt-1.5 text-[11.5px] text-ink-3">Maks. 4 MB. File berumur lebih dari 3 tahun dihapus otomatis; data rekapan tetap tersimpan.</p>
           </section>
 
           {/* history */}

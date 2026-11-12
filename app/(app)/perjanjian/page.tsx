@@ -10,6 +10,7 @@ import { formatDate } from "@/lib/time";
 import { cx } from "@/components/ui";
 import { Banner, DemoBadge, Drawer, Fact, Kpi, MonoChip, NotesSection } from "@/components/ldms/bits";
 import { AgreementForm } from "@/components/ldms/AgreementForm";
+import { FilesSection } from "@/components/ldms/Files";
 
 export const dynamic = "force-dynamic";
 
@@ -111,9 +112,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
           <section className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl border border-line p-4">
             {fields(sel).map(([k, v]) => <Fact key={k} label={k}>{v}</Fact>)}
             <Fact label="Status">{sel.status === "aktif" ? "Aktif" : "Berakhir"}</Fact>
-            {sel.file_url && <Fact label="File"><a href={sel.file_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1">Buka di Drive <ExternalLink size={13} /></a></Fact>}
+            {sel.file_url && sel.kind !== "MLA" && <Fact label="File"><a href={sel.file_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1">Buka di Drive <ExternalLink size={13} /></a></Fact>}
           </section>
           {editable && <div className="flex justify-end"><AgreementForm kind={sel.kind} a={sel} members={members} me={me} brands={brands} units={units} mlas={mlas} /></div>}
+          <FilesSection entity="agreement" id={sel.id} editable={editable} />
           <NotesSection entity="agreement" id={sel.id} editable={editable} title="Catatan" placeholder="Hasil negosiasi, keputusan perpanjangan…" />
           {sel.updated_by && <p className="text-[12px] text-ink-3">Terakhir diubah: {sel.updated_by}</p>}
         </Drawer>

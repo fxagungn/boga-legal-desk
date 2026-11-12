@@ -109,3 +109,10 @@ export const LDMS_MIGRATION_V11 = [
   // Repository holds Legal Opinions and other memos; PKS/PSM/License live in Data Record now.
   `alter table library drop constraint if exists library_kind_check`,
 ];
+
+// v12: Reklame renewal threshold 60 days (2 months before expiry); attachments older than 3 years are removed.
+export const LDMS_MIGRATION_V12 = [
+  `update permit_types set lead_days = 60 where code = 'RKL'`,
+  `create index if not exists files_created_idx on files(created_at)`,
+  `delete from files where created_at < now() - interval '3 years'`,
+];

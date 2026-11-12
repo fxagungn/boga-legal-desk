@@ -2,7 +2,7 @@
 export const LDMS_MIGRATION = [
   // roles: add Supervisor Legal
   `alter table team_members drop constraint if exists team_members_role_check`,
-  `alter table team_members add constraint team_members_role_check check (role in ('staff','supervisor','manager','agm','cpo','admin'))`,
+  `alter table team_members add constraint team_members_role_check check (role in ('staff','supervisor','manager','agm','cpo','admin','viewer'))`,
   `update team_members set role = 'supervisor' where role = 'staff' and lower(name) in ('jala yuan', 'virgiyanti candra devi')`,
   // employee sheet sync
   `alter table team_members add column if not exists sheet_synced boolean not null default false`,

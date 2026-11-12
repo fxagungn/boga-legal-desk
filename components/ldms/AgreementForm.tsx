@@ -92,7 +92,7 @@ export function AgreementForm({ kind, a, members, me, brands, units, mlas }: {
         </div>
         {(k === "MLA" || k === "ULA") && <F id="ag-roy" label="Royalty (% net sales)"><input id="ag-roy" name="royalty_pct" inputMode="decimal" defaultValue={v(a?.royalty_pct)} className="input" /></F>}
         {k === "PKS" && <F id="ag-term" label="Termination clause"><input id="ag-term" name="termination_clause" defaultValue={v(a?.termination_clause)} className="input" /></F>}
-        <F id="ag-file" label="Link file (Google Drive)"><input id="ag-file" name="file_url" type="url" defaultValue={v(a?.file_url)} className="input" placeholder="https://drive.google.com/…" /></F>
+        {k !== "MLA" && <F id="ag-file" label="Link file (Google Drive)"><input id="ag-file" name="file_url" type="url" defaultValue={v(a?.file_url)} className="input" placeholder="https://drive.google.com/…" /></F>}
         <div className="grid grid-cols-2 gap-3">
           <F id="ag-pic" label="PIC Legal">
             <select id="ag-pic" name="pic_id" defaultValue={a?.pic_id ?? me.id} className="input">{members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select>

@@ -218,3 +218,22 @@ export async function savePermitAction(_: Result, f: FormData): Promise<Result> 
     return `${code} ditambahkan`;
   });
 }
+
+/** Attach a file to an agreement (MLA/ULA/PKS) or a government inspection. */
+export async function uploadRecordFileAction(_: Result, f: FormData): Promise<Result> {
+  return run(async () => {
+    const me = await requireMember();
+    const entity = str(f, "entity");
+    if (entity !== "agreement" && entity !== "inspection") throw new Error("Jenis dokumen tidak dikenal.");
+    await requireCan(me, entity, "edit");
+    const id = Number(str(f, "id"));
+    const table = entity === "agreement" ? "agreements" : "inspections";
+    const row = await one<{ id: number }>(`select id from ${table} where id = $1`, [id]);
+    if (!row) throw new Error("Dokumen tidak ditemukan.");
+    const file = f.get("file");
+    if (!(file instanceof File) || file.size === 0) throw new Error("Pilih file dulu.");
+    await saveFile(me, entity, id, file);
+    revalidatePath(entity === "agreement" ? "/perjanjian" : "/pemeriksaan");
+    return "File diunggah";
+  });
+}

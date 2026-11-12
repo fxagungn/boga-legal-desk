@@ -12,7 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     [Number(id)],
   );
   if (!f) return NextResponse.json({ error: "not found" }, { status: 404 });
-  if (!can(await getAccessCtx(), me, f.entity === "agreement" ? "agreement" : "permit", "view")) return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  if (!can(await getAccessCtx(), me, f.entity === "agreement" ? "agreement" : f.entity === "inspection" ? "inspection" : "permit", "view")) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const viewable = /pdf|^image\//.test(f.content_type);
   const inline = req.nextUrl.searchParams.get("view") === "1" && viewable;
   return new NextResponse(Buffer.from(f.b64, "base64"), {

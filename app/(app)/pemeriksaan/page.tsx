@@ -11,6 +11,7 @@ import { cx } from "@/components/ui";
 import { ActionDialog } from "@/components/actions";
 import { DemoBadge, Drawer, Fact, SectionTitle } from "@/components/ldms/bits";
 import { InspectionPrep } from "@/components/ldms/Advice";
+import { FilesSection } from "@/components/ldms/Files";
 import { saveInspectionAction } from "@/app/ldms-actions";
 
 export const dynamic = "force-dynamic";
@@ -84,6 +85,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
           {sel.findings && <section><SectionTitle>Temuan</SectionTitle><p className="text-[13.5px] leading-relaxed">{sel.findings}</p></section>}
           {sel.follow_up && <section><SectionTitle>Tindak lanjut</SectionTitle><p className="text-[13.5px] leading-relaxed">{sel.follow_up}</p></section>}
           {sel.consequence && <section><SectionTitle>Konsekuensi</SectionTitle><p className="text-[13.5px] leading-relaxed">{sel.consequence}</p></section>}
+          <FilesSection entity="inspection" id={sel.id} editable={can("inspection", "edit")} />
           {can("inspection", "edit") && (
             <div className="flex justify-end">
               <ActionDialog action={saveInspectionAction} id={sel.id} wide trigger="Ubah" triggerClass="btn btn-sm" title={`Ubah ${sel.code}`} submit="Simpan">

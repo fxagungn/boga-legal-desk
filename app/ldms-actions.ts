@@ -82,7 +82,8 @@ export async function saveAgreementAction(_: Result, f: FormData): Promise<Resul
       const parent = await one<{ end_date: string; brand_id: number }>(`select to_char(end_date,'YYYY-MM-DD') as end_date, brand_id from agreements where id = $1`, [v.parent_id]);
       v.brand_id = parent?.brand_id ?? v.brand_id;
     }
-    const cols = Object.keys(v) as (keyof typeof v)[];
+    // MLA has no file-link field (files are attached instead): leave any stored link untouched.
+    const cols = (Object.keys(v) as (keyof typeof v)[]).filter((c) => !(c === "file_url" && !f.has("file_url")));
     if (id) {
       await query(`update agreements set ${cols.map((c, i) => `${c} = $${i + 2}`).join(", ")}, updated_at = now(), updated_by = $${cols.length + 2} where id = $1`,
         [id, ...cols.map((c) => v[c]), me.name]);

@@ -116,3 +116,29 @@ export const LDMS_MIGRATION_V12 = [
   `create index if not exists files_created_idx on files(created_at)`,
   `delete from files where created_at < now() - interval '3 years'`,
 ];
+
+// v13: NCP + update threads in Repository, per-account module checklist, SIGAP moved out of LDMS (portal link only).
+export const LDMS_MIGRATION_V13 = [
+  `alter table team_members add column if not exists perms jsonb`,
+  `alter table library add column if not exists policy_ref text`,
+  `alter table library add column if not exists requester text`,
+  `alter table library add column if not exists valid_from date`,
+  `alter table library add column if not exists valid_to date`,
+  `alter table library add column if not exists status text`,
+  `alter table library add column if not exists created_by text`,
+  `alter table library add column if not exists updated_at timestamptz`,
+  `update library set created_by = updated_by where created_by is null`,
+  `create table if not exists library_updates (
+    id serial primary key,
+    library_id int not null references library(id) on delete cascade,
+    period text,
+    body text not null,
+    new_status text,
+    by_id int references team_members(id) on delete set null,
+    by_name text not null,
+    created_at timestamptz not null default now()
+  )`,
+  `create index if not exists library_updates_doc_idx on library_updates(library_id, created_at desc)`,
+  // SIGAP demo rows (and the KB entries made from them) go; real SIGAP rows stay in the table, hidden.
+  `delete from sigap_results where is_demo`,
+];

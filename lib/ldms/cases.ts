@@ -42,6 +42,27 @@ export interface CaseRow {
   pic_id: number | null; pic_name: string | null; external_counsel: string | null; status: CaseStatus; decision: string | null; outcome: string | null;
   settlement: string | null; closed_at: string | null; lesson: string | null; preventive: string | null; kb_code: string | null; is_demo: boolean;
   age_days: number; step_count: number; doc_count: number; updated_by: string | null;
+  /** Latest step of the handling flow, and every stage passed so far. */
+  last_stage: string | null; last_handler: string | null; last_step_date: string | null; stages_done: string[] | null;
+}
+
+/** Six-step progress shown on the case list. Each entry groups the detailed stages it covers. */
+export const PROGRESS: { label: string; stages: string[] }[] = [
+  { label: "Laporan", stages: ["Laporan diterima"] },
+  { label: "Investigasi", stages: ["Investigasi & pengumpulan bukti"] },
+  { label: "Berita Acara", stages: ["Berita Acara"] },
+  { label: "Eskalasi / negosiasi", stages: ["Eskalasi", "Negosiasi / mediasi", "Proses hukum"] },
+  { label: "Keputusan", stages: ["Keputusan"] },
+  { label: "Penutupan", stages: ["Penutupan"] },
+];
+
+/** Index (0-5) of the furthest progress step reached; a closed case is always at the last step. */
+export function progressOf(c: Pick<CaseRow, "status" | "stages_done">): number {
+  if (c.status === "selesai") return PROGRESS.length - 1;
+  const done = c.stages_done ?? [];
+  let at = 0;
+  PROGRESS.forEach((p, i) => { if (p.stages.some((s) => done.includes(s))) at = i; });
+  return at;
 }
 
 const COLS = `c.id, c.code, c.category, c.title, c.unit_id, u.name as unit_name, b.name as brand,
@@ -50,8 +71,11 @@ const COLS = `c.id, c.code, c.category, c.title, c.unit_id, u.name as unit_name,
   c.settlement::text, to_char(c.closed_at,'YYYY-MM-DD') as closed_at, c.lesson, c.preventive, c.kb_code, c.is_demo,
   (coalesce(c.closed_at, (now() at time zone 'Asia/Jakarta')::date) - coalesce(c.reported_date, c.created_at::date))::int as age_days,
   (select count(*)::int from case_steps s where s.case_id = c.id) as step_count,
-  (select count(*)::int from case_docs d where d.case_id = c.id) as doc_count, c.updated_by`;
-const FROM = `from cases c left join units u on u.id = c.unit_id left join brands b on b.id = u.brand_id left join team_members m on m.id = c.pic_id`;
+  (select count(*)::int from case_docs d where d.case_id = c.id) as doc_count, c.updated_by,
+  ls.stage as last_stage, ls.handler as last_handler, to_char(ls.step_date,'YYYY-MM-DD') as last_step_date,
+  (select array_agg(distinct s.stage) from case_steps s where s.case_id = c.id) as stages_done`;
+const FROM = `from cases c left join units u on u.id = c.unit_id left join brands b on b.id = u.brand_id left join team_members m on m.id = c.pic_id
+  left join lateral (select stage, handler, step_date from case_steps s where s.case_id = c.id order by s.step_date desc, s.id desc limit 1) ls on true`;
 
 export const listCases = () => query<CaseRow>(`select ${COLS} ${FROM} order by (c.status = 'selesai'), c.reported_date desc nulls last, c.code desc`);
 export const getCaseByCode = async (code: string) => (await query<CaseRow>(`select ${COLS} ${FROM} where upper(c.code) = upper($1)`, [code]))[0] ?? null;
@@ -103,14 +127,10 @@ export interface Insight {
   byCategory: { name: string; n: number; open: number }[];
   byRootCause: { name: string; n: number }[];
   byOutcome: { name: string; n: number }[];
-  sigap: { name: string; n: number }[];
 }
 
 export async function caseInsight(): Promise<Insight> {
-  const [cases, sigap] = await Promise.all([
-    listCases(),
-    query<{ name: string; n: number }>(`select coalesce(nullif(category,''),'Lainnya') as name, count(*)::int as n from sigap_results group by 1 order by 2 desc`),
-  ]);
+  const cases = await listCases();
   const count = (xs: (string | null)[]) => {
     const m = new Map<string, number>();
     for (const x of xs) if (x) m.set(x, (m.get(x) ?? 0) + 1);
@@ -131,6 +151,5 @@ export async function caseInsight(): Promise<Insight> {
     byCategory: [...cats.entries()].map(([name, v]) => ({ name, ...v })).sort((a, b) => b.n - a.n),
     byRootCause: count(cases.map((c) => c.root_cause_cat)),
     byOutcome: count(closed.map((c) => c.outcome)),
-    sigap,
   };
 }

@@ -64,11 +64,10 @@ export async function saveSigapFlowAction(_: Result, f: FormData): Promise<Resul
   return run(async () => {
     const me = await sa();
     const url = str(f, "url");
-    if (url && !/^https:\/\//i.test(url)) throw new Error("Link SIGAP harus diawali https://");
-    const categories = str(f, "categories").split("\n").map((x) => x.trim()).filter(Boolean);
-    await saveFlows({ sigap: { url, newTab: f.get("newTab") === "on", ...(categories.length ? { categories } : {}) } });
-    await audit(me, "ubah pengaturan SIGAP", "admin", "sigap", url || "belum tersambung");
-    return "Pengaturan SIGAP disimpan";
+    if (!/^https:\/\//i.test(url)) throw new Error("Link SIGAP harus diawali https://");
+    await saveFlows({ sigap: { url } });
+    await audit(me, "ubah alamat SIGAP", "admin", "sigap", url);
+    return "Alamat SIGAP disimpan";
   });
 }
 

@@ -2,7 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { DEFAULT_WORKFLOWS, type Workflows } from "./workflow";
 import { LDMS_MIGRATION } from "./ldms/schema";
 import { LDMS_MIGRATION_V9 } from "./ldms/schema2";
-import { LDMS_MIGRATION_V11, LDMS_MIGRATION_V12 } from "./ldms/schema3";
+import { LDMS_MIGRATION_V11, LDMS_MIGRATION_V12, LDMS_MIGRATION_V13 } from "./ldms/schema3";
 
 export const hasDb = () => Boolean(dbUrl());
 const dbUrl = () => process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.DATABASE_URL_UNPOOLED || "";
@@ -28,7 +28,7 @@ function raw(): Client {
   return client;
 }
 
-const SCHEMA_VERSION = 12;
+const SCHEMA_VERSION = 13;
 
 const MIGRATION = [
   `create table if not exists app_settings (key text primary key, value jsonb not null, updated_at timestamptz not null default now())`,
@@ -167,6 +167,8 @@ const MIGRATION = [
   ...LDMS_MIGRATION_V11,
   // v12: Reklame H-60, 3-year attachment retention
   ...LDMS_MIGRATION_V12,
+  // v13: NCP & update threads, per-account access, SIGAP out
+  ...LDMS_MIGRATION_V13,
 ];
 
 let ready: Promise<void> | null = null;
@@ -188,6 +190,7 @@ export function ensureSchema(): Promise<void> {
       const s2 = await import("./ldms/seed2");
       await s2.seedOutlets2026(q);
       await s2.seedDemoV2(q);
+      await s2.seedDemoNcp(q);
       await q.query(
         `insert into app_settings (key, value) values ('schema_version', $1::jsonb)
          on conflict (key) do update set value = excluded.value, updated_at = now()`,

@@ -340,25 +340,43 @@ export async function seedDemoV2(q: Q) {
      where c.is_demo and c.status = 'selesai' on conflict (code) do nothing`,
   );
   await q.query(`update cases set kb_code = 'KB-' || code where is_demo and status = 'selesai'`);
+}
 
-  /* ---------- SIGAP results (contoh) ---------- */
-  const sg: [string, number, string, string, string, string, string, string][] = [
-    ["SGP-2026-001", -160, "PDPS", "Kepatuhan SOP", "Merokok di area belakang dapur", "Surat Teguran", "Smoking area tidak tersedia di jalur belakang outlet", "Koordinasi dengan pengelola mal untuk smoking area karyawan; sosialisasi ulang SOP."],
-    ["SGP-2026-004", -95, "PLKK", "Fraud & kriminal", "Diskon karyawan dipakai untuk transaksi pelanggan umum", "SP1", "Kartu diskon karyawan tidak divalidasi di POS", "Validasi NIK di POS untuk setiap diskon karyawan; audit anomali diskon bulanan."],
-    ["SGP-2026-007", -40, "KKGI", "Keamanan pangan", "Log suhu chiller tidak diisi 3 hari", "Surat Teguran", "Penanggung jawab log tidak ditetapkan per shift", "Tetapkan PIC log suhu per shift dan cek oleh MOD saat closing."],
+/** Two example NCPs with update threads (only when demo data is in use). Runs once. */
+export async function seedDemoNcp(q: Q) {
+  const lock = (await q.query(`insert into app_settings (key, value) values ('ldms_demo_ncp', 'true'::jsonb) on conflict (key) do nothing returning key`)) as unknown[];
+  if (lock.length === 0 || process.env.SEED_DEMO === "false") return;
+  const demo = (await q.query(`select count(*)::int as n from library where is_demo`)) as { n: number }[];
+  if (demo[0].n === 0) return;
+  const docs: [string, number, string, string, string, string, string, number, number, string, [number, string, string, string | null][]][] = [
+    ["LIB-NCP-001", -200, "[Contoh] Penyimpangan jam operasional outlet di luar ketentuan mal", "Operations — Area Jakarta Selatan",
+      "Kebijakan jam operasional outlet (SOP Operasional)", "Renovasi area food court oleh pengelola mal membuat outlet hanya bisa buka sampai pukul 20.00.",
+      "Risiko: potensi klaim pengelola atas kewajiban jam buka di perjanjian sewa. Mitigasi: surat persetujuan tertulis dari pengelola mal dilampirkan.", -200, 165, "Disetujui",
+      [[-110, "Q3 2026", "Renovasi mundur dari jadwal; pengelola mal menerbitkan surat perpanjangan. Masa berlaku NCP diperpanjang satu kuartal.", null],
+        [-20, "Q4 2026", "Renovasi selesai 80%. Diperkirakan jam operasional normal kembali awal tahun depan; NCP tidak akan diperpanjang lagi.", null]]],
+    ["LIB-NCP-002", -150, "[Contoh] Penggunaan template PKS vendor (bukan template perusahaan)", "Procurement",
+      "Kebijakan kontrak: wajib memakai template PKS perusahaan", "Vendor tunggal untuk suku cadang mesin tertentu hanya bersedia memakai template miliknya.",
+      "Risiko: klausul pembatasan tanggung jawab vendor. Mitigasi: addendum yang menambah service credit dan hak terminasi.", -150, -30, "Berakhir",
+      [[-28, "Q4 2026", "Kontrak berakhir dan tidak diperpanjang; vendor pengganti memakai template perusahaan.", "Berakhir"]]],
   ];
-  for (const [code, d, unit, cat, violation, decision, rc, lesson] of sg) {
+  const today = new Date(Date.now() + 7 * 3600_000);
+  today.setUTCHours(0, 0, 0, 0);
+  const at = (n: number) => new Date(+today + n * 86_400_000).toISOString().slice(0, 10);
+  try {
+  for (const [code, d, title, requester, policy, reason, risk, from, to, status, updates] of docs) {
     const r = (await q.query(
-      `insert into sigap_results (code, ref, result_date, unit_id, category, violation, decision, root_cause, lesson, is_demo, updated_by)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,'Data contoh') returning id`,
-      [code, `[Contoh] ${code.replace("SGP", "SIGAP")}`, date(d), allUnits.find((u) => u.code === unit)?.id ?? null, cat, violation, decision, rc, lesson],
+      `insert into library (code, kind, doc_date, title, requester, policy_ref, core, key_points, valid_from, valid_to, status, is_demo, updated_by, created_by, created_at)
+       values ($1,'NCP',$2::date,$3,$4,$5,$6,$7,$8,$9,$10,true,'Data contoh','Data contoh',$2::date) on conflict (code) do nothing returning id`,
+      [code, at(d), title, requester, policy, reason, risk, at(from), at(to), status],
     )) as { id: number }[];
-    await q.query(
-      `insert into kb_cases (code, case_date, title, unit_label, brand, category, summary, sanction, root_cause, lesson, outcome, sigap_id, source, is_demo)
-       select 'KB-' || s.code, s.result_date, s.violation, u.name, b.name, 'SIGAP · ' || s.category, s.violation, s.decision, s.root_cause, s.lesson, 'Sanksi internal', s.id, 'sigap', true
-       from sigap_results s left join units u on u.id = s.unit_id left join brands b on b.id = u.brand_id where s.id = $1 on conflict (code) do nothing`,
-      [r[0].id],
-    );
-    await q.query(`update sigap_results set kb_code = 'KB-' || code where id = $1`, [r[0].id]);
+    if (!r[0]) continue;
+    for (const [ud, period, body, ns] of updates) {
+      await q.query(`insert into library_updates (library_id, period, body, new_status, by_name, created_at) values ($1,$2,$3,$4,'Data contoh',$5::date)`, [r[0].id, period, body, ns, at(ud)]);
+    }
+  }
+  } catch (e) {
+    // Release the lock so the next start retries instead of silently skipping the examples.
+    await q.query(`delete from app_settings where key = 'ldms_demo_ncp'`);
+    throw e;
   }
 }

@@ -7,12 +7,13 @@ const nextConfig: NextConfig = {
   // Retired screens: old links land on their replacement.
   async redirects() {
     return [
-      { source: "/tanya", destination: "/", permanent: false },
-      { source: "/sanksi", destination: "/sigap", permanent: false },
+      { source: "/tanya", destination: "/dashboard", permanent: false },
+      { source: "/sanksi", destination: "/", permanent: false },
+      { source: "/sigap", destination: "/", permanent: false },
       { source: "/terapkan-matrix", destination: "/kb", permanent: false },
       { source: "/matrix", destination: "/kb", permanent: false },
       { source: "/pustaka", destination: "/repository", permanent: false },
-      { source: "/hr/:path*", destination: "/", permanent: false },
+      { source: "/hr/:path*", destination: "/dashboard", permanent: false },
     ];
   },
 };

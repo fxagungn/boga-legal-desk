@@ -13,7 +13,7 @@ import { saveKbCaseAction, syncKbAction } from "@/app/ldms-actions";
 
 export const dynamic = "force-dynamic";
 
-const SOURCE: Record<string, string> = { case: "Case", sigap: "SIGAP", docs: "Google Docs", app: "Manual", demo: "Contoh" };
+const SOURCE: Record<string, string> = { case: "Case", sigap: "SIGAP (arsip)", docs: "Google Docs", app: "Manual", demo: "Contoh" };
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ q?: string; src?: string; d?: string }> }) {
   const { can } = await pageGuard("kb");
@@ -36,7 +36,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
         <Stat label="Case aktif" value={ins.open} sub={`dari ${ins.total} case`} href="/cases" />
         <Stat label="Eksposur aktif" value={ins.exposureOpen ? money(ins.exposureOpen) : "—"} small href="/cases" />
         <Stat label="Rata-rata selesai" value={ins.avgDaysToClose ?? "—"} sub={ins.avgDaysToClose !== null ? "hari" : undefined} />
-        <Stat label="Pelajaran" value={all.length} sub="case · SIGAP · manual" />
+        <Stat label="Pelajaran" value={all.length} sub="case · manual" />
       </section>
 
       <div className="grid gap-5 lg:grid-cols-3">
@@ -67,12 +67,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
             {ins.byOutcome.map((o) => <li key={o.name} className="flex justify-between gap-2"><span>{o.name}</span><span className="font-mono text-ink-2">{o.n}</span></li>)}
             {ins.byOutcome.length === 0 && <li className="text-ink-3">Belum ada case selesai.</li>}
           </ul>
-          {ins.sigap.length > 0 && (
-            <>
-              <h3 className="mt-4 text-[12px] font-bold text-ink-3 uppercase">SIGAP per kategori</h3>
-              <ul className="mt-2 space-y-1.5 text-[13px]">{ins.sigap.map((o) => <li key={o.name} className="flex justify-between gap-2"><span>{o.name}</span><span className="font-mono text-ink-2">{o.n}</span></li>)}</ul>
-            </>
-          )}
         </section>
       </div>
 
@@ -83,7 +77,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ q
             <label className="sr-only" htmlFor="kq">Cari</label>
             <input id="kq" name="q" defaultValue={sp.q} placeholder="Cari pelajaran…" className="input h-9 min-w-[160px] flex-1" />
             <label className="sr-only" htmlFor="ks">Sumber</label>
-            <select id="ks" name="src" defaultValue={sp.src ?? ""} className="input h-9 w-auto"><option value="">Semua sumber</option>{["case", "sigap", "docs", "app"].map((k) => <option key={k} value={k}>{SOURCE[k]}</option>)}</select>
+            <select id="ks" name="src" defaultValue={sp.src ?? ""} className="input h-9 w-auto"><option value="">Semua sumber</option>{["case", "docs", "app"].map((k) => <option key={k} value={k}>{SOURCE[k]}</option>)}</select>
             <button className="btn btn-sm h-9">Cari</button>
           </form>
           {docUrl && <a href={docUrl} target="_blank" rel="noreferrer" className="btn btn-sm" title="Buka Google Docs Knowledge Base">Docs <ExternalLink size={13} /></a>}
@@ -158,9 +152,7 @@ function KbDrawer({ k, closeHref }: { k: KbCase; closeHref: string }) {
       </section>
       {k.investigation && <section><SectionTitle>Alur penanganan</SectionTitle><p className="text-[13.5px] leading-relaxed">{k.investigation}</p></section>}
       {(k.summary || k.chronology) && <section><SectionTitle>Ringkasan</SectionTitle><p className="text-[13.5px] leading-relaxed whitespace-pre-line">{k.chronology ?? k.summary}</p></section>}
-      {(k.case_code || k.sigap_code) && (
-        <div>{k.case_code ? <Link href={`/cases?s=semua&d=${k.case_code}`} className="btn btn-sm">Buka {k.case_code}</Link> : <Link href="/sigap?tab=hasil" className="btn btn-sm">Buka {k.sigap_code} di SIGAP</Link>}</div>
-      )}
+      {k.case_code && <div><Link href={`/cases?s=semua&d=${k.case_code}`} className="btn btn-sm">Buka {k.case_code}</Link></div>}
     </Drawer>
   );
 }

@@ -9,7 +9,7 @@ import { aiJson, aiReady, logAi } from "@/lib/ai";
 import { appendCaseToKb, searchDrive, syncKbFromDocs } from "@/lib/drive";
 import { audit, listPermits } from "@/lib/ldms/permits";
 import { AGR_KINDS, listAgreements, nextAgreementCode, type AgrKind } from "@/lib/ldms/agreements";
-import { INSPECTION_RESULTS, INSPECTION_SYSTEM, LIB_PREFIX, LIBRARY_KINDS, LIBRARY_SYSTEM, listInspections, listKb, listLibrary, type AdviceResult } from "@/lib/ldms/history";
+import { INSPECTION_RESULTS, INSPECTION_SYSTEM, LIB_PREFIX, LIBRARY_KINDS, LIBRARY_SYSTEM, NCP_STATUS, listInspections, listKb, listLibrary, type AdviceResult } from "@/lib/ldms/history";
 import { runScan } from "@/lib/ldms/reminders";
 import type { Result } from "@/app/actions";
 
@@ -41,6 +41,9 @@ async function runData<T>(fn: () => Promise<T>): Promise<DataResult<T>> {
     return { error: e instanceof Error ? e.message : "Gagal. Coba lagi." };
   }
 }
+
+/** When the AI answers in prose instead of the requested format, show the prose rather than an error. */
+const plainAdvice = (text: string): AdviceResult => ({ ringkasan: text, catatan: "Jawaban AI ditampilkan apa adanya (format terstruktur tidak terbaca).", keyakinan: "—", poin: [], risiko: [], referensi: [], langkah: [] });
 
 /** Next code like INS-2026-007 / KB-2026-003 for a table with a `code` column. */
 async function nextCode(prefix: string, table: string) {
@@ -144,7 +147,7 @@ export async function inspectionAdviceAction(input: { agency: string; unitId: nu
       `STATUS PERIZINAN UNIT ${unit?.name ?? "-"} SAAT INI:\n${JSON.stringify(permits.map((p) => ({ id: p.code, izin: p.type_name, sisaHari: p.days, jatuhTempo: p.expiry_date, statusRenewal: p.renewal_status, blocker: p.blocker_note })))}`,
       `PERMINTAAN:\n${JSON.stringify({ instansi: input.agency, unit: unit?.name, jenisPemeriksaan: input.kind, konteks: input.context })}`,
     ].join("\n\n");
-    const { data } = await aiJson<AdviceResult>(me, "inspection", INSPECTION_SYSTEM, user, 2500);
+    const { data } = await aiJson<AdviceResult>(me, "inspection", INSPECTION_SYSTEM, user, 6000, plainAdvice);
     return { result: data, due };
   });
 }
@@ -156,23 +159,54 @@ export async function saveLibraryAction(_: Result, f: FormData): Promise<Result>
     const me = await requireMember();
     await requireCan(me, "library", "edit");
     const id = Number(str(f, "id")) || 0;
-    const kind = str(f, "kind");
+    const kind = id ? (await one<{ kind: string }>(`select kind from library where id = $1`, [id]))?.kind ?? "" : str(f, "kind");
     if (!(LIBRARY_KINDS as readonly string[]).includes(kind)) throw new Error("Pilih jenis dokumen.");
     if (!str(f, "title")) throw new Error("Judul wajib diisi.");
-    const vals = [kind, isoDate(str(f, "doc_date")), str(f, "title"), str(f, "parties") || null, str(f, "core") || null, str(f, "key_points") || null, str(f, "outcome") || null, str(f, "file_url") || null, me.name];
+    const ncp = kind === "NCP";
+    const status = ncp ? ((NCP_STATUS as readonly string[]).includes(str(f, "status")) ? str(f, "status") : "Diajukan") : null;
+    const from = isoDate(str(f, "valid_from")), to = isoDate(str(f, "valid_to"));
+    if (from && to && from > to) throw new Error("Masa berlaku: tanggal mulai tidak boleh setelah tanggal berakhir.");
+    const vals = [isoDate(str(f, "doc_date")), str(f, "title"), str(f, "parties") || null, str(f, "core") || null, str(f, "key_points") || null,
+      str(f, "file_url") || null, ncp ? str(f, "policy_ref") || null : null, ncp ? str(f, "requester") || null : null, ncp ? from : null, ncp ? to : null, status, me.name];
     if (id) {
-      await query(`update library set kind=$2, doc_date=$3, title=$4, parties=$5, core=$6, key_points=$7, outcome=$8, file_url=$9, updated_by=$10 where id=$1`, [id, ...vals]);
-      await audit(me, "ubah library", "library", id, str(f, "title"));
+      await query(`update library set doc_date=$2, title=$3, parties=$4, core=$5, key_points=$6, file_url=$7, policy_ref=$8, requester=$9, valid_from=$10, valid_to=$11,
+        status=$12, updated_by=$13, updated_at=now() where id=$1`, [id, ...vals]);
+      await audit(me, "ubah dokumen repository", "library", id, str(f, "title"));
       revalidatePath("/repository");
       return "Dokumen disimpan";
     }
     const prefix = LIB_PREFIX[kind];
     const n = (await one<{ n: number }>(`select coalesce(max(substring(code from '\\d+$')::int), 0) + 1 as n from library where code like $1`, [`${prefix}-%`]))!.n;
     const code = `${prefix}-${String(n).padStart(3, "0")}`;
-    const r = await one<{ id: number }>(`insert into library (code, kind, doc_date, title, parties, core, key_points, outcome, file_url, updated_by) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id`, [code, ...vals]);
-    await audit(me, "tambah library", "library", r!.id, `${code} ${str(f, "title")}`);
+    const r = await one<{ id: number }>(
+      `insert into library (code, kind, doc_date, title, parties, core, key_points, file_url, policy_ref, requester, valid_from, valid_to, status, updated_by, created_by)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$14) returning id`, [code, kind, ...vals]);
+    await audit(me, "tambah dokumen repository", "library", r!.id, `${code} ${str(f, "title")}`);
     revalidatePath("/repository");
     return `${code} ditambahkan`;
+  });
+}
+
+/** A dated update inside an NCP / Legal Opinion thread. Author and time are recorded by the system; updates are never edited or deleted. */
+export async function addLibraryUpdateAction(_: Result, f: FormData): Promise<Result> {
+  return run(async () => {
+    const me = await requireMember();
+    await requireCan(me, "library", "edit");
+    const id = Number(str(f, "id"));
+    const doc = await one<{ code: string; kind: string; status: string | null }>(`select code, kind, status from library where id = $1`, [id]);
+    if (!doc) throw new Error("Dokumen tidak ditemukan.");
+    const body = str(f, "body");
+    if (!body) throw new Error("Isi pembaruan masih kosong.");
+    if (body.length > 6000) throw new Error("Pembaruan terlalu panjang (maks. 6.000 karakter).");
+    const ns = str(f, "new_status");
+    const newStatus = doc.kind === "NCP" && (NCP_STATUS as readonly string[]).includes(ns) && ns !== doc.status ? ns : null;
+    const to = doc.kind === "NCP" ? isoDate(str(f, "valid_to")) : null;
+    await query(`insert into library_updates (library_id, period, body, new_status, by_id, by_name) values ($1,$2,$3,$4,$5,$6)`,
+      [id, str(f, "period") || null, body, newStatus, me.id, me.name]);
+    if (newStatus || to) await query(`update library set status = coalesce($2, status), valid_to = coalesce($3::date, valid_to) where id = $1`, [id, newStatus, to]);
+    await audit(me, "pembaruan dokumen repository", "library", id, `${doc.code}${str(f, "period") ? ` · ${str(f, "period")}` : ""}${newStatus ? ` · status → ${newStatus}` : ""}`);
+    revalidatePath("/repository");
+    return "Pembaruan ditambahkan";
   });
 }
 
@@ -181,23 +215,27 @@ export async function libraryAdviceAction(input: { kind: string; counterparty: s
     const me = await requireMember();
     await requireCan(me, "library", "view");
     if (input.issue.trim().length < 10) throw new Error("Tulis isu yang mau dikonsultasikan.");
-    const lib = (await listLibrary()).map((l) => ({ id: l.code, jenis: l.kind, tanggal: l.doc_date, judul: l.title, pihak: l.parties, inti: l.core, poinKunci: l.key_points, outcome: l.outcome }));
+    const lib = (await listLibrary()).map((l) => ({
+      id: l.code, jenis: l.kind, tanggal: l.doc_date, judul: l.title, pihak: l.parties ?? l.requester, inti: l.core, poinKunci: l.key_points,
+      ...(l.kind === "NCP" ? { kebijakanDisimpangi: l.policy_ref, status: l.status, berlakuSampai: l.valid_to } : {}),
+      ...(l.updates_text ? { pembaruan: l.updates_text.slice(0, 1500) } : {}),
+    }));
     const kb = (await listKb()).map((k) => ({ id: k.code, judul: k.title, kategori: k.category, rootCause: k.root_cause, hasil: k.outcome, pelajaran: k.lesson }));
     const agr = (await listAgreements()).filter((a) => a.status === "aktif").map((a) => ({ id: a.code, jenis: a.kind, judul: a.title, pihak: a.counterparty, berakhir: a.end_date, skema: a.scheme, nilai: a.value, mataUang: a.currency, terminasi: a.termination_clause }));
     const drive = await searchDrive(`${input.kind} ${input.counterparty} ${input.issue}`, 4).catch(() => []);
     const user = [
-      `REPOSITORY (LEGAL OPINION & MEMO):\n${JSON.stringify(lib)}`, `KNOWLEDGE BASE (pelajaran case & SIGAP):\n${JSON.stringify(kb.slice(0, 60))}`,
+      `REPOSITORY (LEGAL OPINION & MEMO):\n${JSON.stringify(lib)}`, `KNOWLEDGE BASE (pelajaran case):\n${JSON.stringify(kb.slice(0, 60))}`,
       `AGREEMENT AKTIF (ringkas):\n${JSON.stringify(agr.slice(0, 80))}`,
       drive.length ? `DOKUMEN REPOSITORY GOOGLE DRIVE (kutipan):\n${JSON.stringify(drive.map((d) => ({ file: d.name, kutipan: d.snippet.slice(0, 800) })))}` : "",
       `KONSULTASI:\n${JSON.stringify(input)}`,
     ].filter(Boolean).join("\n\n");
-    return (await aiJson<AdviceResult>(me, "library", LIBRARY_SYSTEM, user, 2500)).data;
+    return (await aiJson<AdviceResult>(me, "library", LIBRARY_SYSTEM, user, 6000, plainAdvice)).data;
   });
 }
 
 /* ======================= KNOWLEDGE BASE ======================= */
 
-/** A lesson written directly in the KB (most entries come from closed Cases and SIGAP results). */
+/** A lesson written directly in the KB (most entries come from closed Cases). */
 export async function saveKbCaseAction(_: Result, f: FormData): Promise<Result> {
   return run(async () => {
     const me = await requireMember();

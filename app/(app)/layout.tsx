@@ -8,7 +8,7 @@ import { ROLE_LABEL } from "@/lib/workflow";
 import { logout } from "@/app/actions";
 import { initials } from "@/lib/format";
 import { NAV_ITEMS } from "@/lib/nav";
-import { can, getAccessCtx, isSuperAdmin } from "@/lib/access";
+import { can, getAccessCtx, isLegal, isSuperAdmin } from "@/lib/access";
 import { ChatWidget } from "@/components/chat/ChatWidget";
 import { NavProgress } from "@/components/NavProgress";
 
@@ -26,7 +26,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   );
   const badges = { "/perizinan": { n: mine[0]?.n || 0, hot: true } };
   const superAdmin = isSuperAdmin(me);
-  const allowed = NAV_ITEMS.filter((i) => (i.superAdmin ? superAdmin : !i.module || can(access, me, i.module, "view"))).map((i) => i.href);
+  const allowed = NAV_ITEMS.filter((i) => (i.superAdmin ? superAdmin : i.legal ? isLegal(me) : !i.module || can(access, me, i.module, "view"))).map((i) => i.href);
   const chatOk = can(access, me, "chat", "view");
   const roleTitle = me.title ?? ROLE_LABEL[me.role];
   const userCard = (
@@ -61,7 +61,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen md:flex">
       <aside className="hidden w-[252px] shrink-0 flex-col border-r border-line bg-surface md:sticky md:top-0 md:flex md:h-screen">
-        <a href="/" className="flex items-center gap-[11px] border-b border-line-2 px-5 pt-[22px] pb-[18px] hover:no-underline">
+        <a href="/dashboard" className="flex items-center gap-[11px] border-b border-line-2 px-5 pt-[22px] pb-[18px] hover:no-underline">
           <span className="grid h-9 w-9 place-items-center rounded-[9px] bg-brand text-[14px] font-extrabold tracking-[-0.5px] text-white" aria-hidden="true">BG</span>
           <span className="leading-tight">
             <span className="block text-[14px] font-extrabold tracking-[-0.3px] text-ink">Legal DMS</span>

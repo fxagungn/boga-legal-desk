@@ -6,7 +6,7 @@ import { Loader2, Search } from "lucide-react";
 import { searchRowsAction } from "@/app/ldms-actions";
 import type { SearchRow } from "@/lib/ldms/search";
 
-const MODULES = ["Semua modul", "Permit", "Perjanjian", "Pemeriksaan", "Cases", "SIGAP", "Repository", "Knowledge Base"] as const;
+const MODULES = ["Semua modul", "Permit", "Perjanjian", "Pemeriksaan", "Cases", "Repository", "Knowledge Base"] as const;
 const STATUS = ["Semua status", "Overdue / lewat", "≤30 hari", "31-90 hari", "Aman", "Bersomasi", "Belum acknowledge", "Belum diproses"] as const;
 type Status = (typeof STATUS)[number];
 

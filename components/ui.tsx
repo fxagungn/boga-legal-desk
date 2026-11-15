@@ -5,7 +5,7 @@ export const cx = (...a: (string | false | null | undefined)[]) => a.filter(Bool
 
 export function Logo({ sub = true }: { sub?: boolean }) {
   return (
-    <Link href="/" className="flex items-center gap-2.5">
+    <Link href="/dashboard" className="flex items-center gap-2.5">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/logo.svg" alt="" className="h-8 w-8" />
       <span className="leading-tight">

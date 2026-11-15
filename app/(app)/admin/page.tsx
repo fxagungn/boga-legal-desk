@@ -23,7 +23,7 @@ import * as X from "@/app/admin-actions";
 export const dynamic = "force-dynamic";
 
 const TABS = [
-  ["akses", "Hak akses"], ["tim", "Tim & akun"], ["alur", "Alur & SIGAP"], ["master", "Master data"], ["drive", "Google Drive"], ["ai", "AI"], ["sistem", "Sistem"],
+  ["akses", "Hak akses"], ["tim", "Tim & akun"], ["alur", "Alur"], ["master", "Master data"], ["drive", "Google Drive"], ["ai", "AI"], ["sistem", "Sistem"],
 ] as const;
 type Tab = (typeof TABS)[number][0];
 
@@ -134,13 +134,11 @@ async function FlowsTab() {
         </ActionForm>
       </section>
       <section className="card p-5">
-        <h2 className="text-[15px] font-extrabold">SIGAP</h2>
-        <p className="mt-1 mb-4 text-[12.5px] text-ink-3">Sistem SIGAP ditampilkan di Data Record › SIGAP. Hasilnya masuk ke Knowledge Base.</p>
-        <ActionForm action={X.saveSigapFlowAction} success="Disimpan" className="grid gap-3.5">
-          <div><label className="label" htmlFor="sg-url">Link SIGAP</label><input id="sg-url" name="url" type="url" defaultValue={flows.sigap.url} placeholder="https://…" className="input" /></div>
-          <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" name="newTab" defaultChecked={flows.sigap.newTab} className="h-4 w-4 accent-[#c41e29]" /> Buka di tab baru (bila SIGAP tidak bisa di-embed)</label>
-          <div><label className="label" htmlFor="sg-cat">Kategori pelanggaran (satu per baris)</label><textarea id="sg-cat" name="categories" rows={5} defaultValue={flows.sigap.categories.join("\n")} className="input" /></div>
-          <div><Submit>Simpan SIGAP</Submit></div>
+        <h2 className="text-[15px] font-extrabold">Alamat SIGAP</h2>
+        <p className="mt-1 mb-4 text-[12.5px] text-ink-3">Dibuka dari kartu SIGAP di halaman awal. Login ditangani SIGAP sendiri.</p>
+        <ActionForm action={X.saveSigapFlowAction} success="Disimpan" className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+          <div><label className="label" htmlFor="sg-url">Link SIGAP</label><input id="sg-url" name="url" type="url" required defaultValue={flows.sigap.url} className="input" /></div>
+          <Submit>Simpan</Submit>
         </ActionForm>
       </section>
     </div>

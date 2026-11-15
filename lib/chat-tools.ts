@@ -6,7 +6,6 @@ import { searchDrive } from "./drive";
 import { getAgreementByCode, listAgreements } from "./ldms/agreements";
 import type { Module } from "./access";
 import { CASE_STATUS, caseInsight, listCases, listSteps } from "./ldms/cases";
-import { listSigap } from "./ldms/sigap";
 import { listInspections, listKb, listLibrary } from "./ldms/history";
 import { getPermitByCode, listNotes, listPermits, needsAck, RENEWAL_LABEL } from "./ldms/permits";
 
@@ -79,7 +78,7 @@ export function ldmsTools(canView: (m: Module) => boolean) {
           if (!a) return { error: `Perjanjian ${code} tidak ditemukan.` };
           return { ...a, catatan: (await listNotes("agreement", a.id)).slice(0, 15).map((n) => ({ oleh: n.by_name, pada: n.created_at, isi: n.body })) };
         }
-        return { error: "Gunakan tool lain untuk CASE/SGP/KB/INS/LIB." };
+        return { error: "Gunakan tool lain untuk CASE/KB/INS/LIB." };
       },
     }),
 
@@ -109,22 +108,13 @@ export function ldmsTools(canView: (m: Module) => boolean) {
     }),
 
     case_insight: tool({
-      description: "Statistik Cases & SIGAP: jumlah per kategori, root cause paling sering, distribusi hasil, rata-rata hari penyelesaian, eksposur case aktif.",
+      description: "Statistik Cases: jumlah per kategori, root cause paling sering, distribusi hasil, rata-rata hari penyelesaian, eksposur case aktif.",
       inputSchema: z.object({}),
       execute: async () => caseInsight(),
     }),
 
-    search_sigap: tool({
-      description: "Cari hasil SIGAP (SGP-YYYY-NNN): pelanggaran disiplin, keputusan/sanksi, root cause, pelajaran. Tanpa nama karyawan.",
-      inputSchema: z.object({ q: z.string().optional() }),
-      execute: async ({ q }) => {
-        const rows = (await listSigap()).filter((s) => has([s.code, s.violation, s.category, s.unit_name, s.decision, s.root_cause, s.lesson], q));
-        return { total: rows.length, rows: rows.slice(0, 20).map((s) => ({ id: s.code, tanggal: s.result_date, unit: s.unit_name, kategori: s.category, pelanggaran: s.violation, keputusan: s.decision, rootCause: s.root_cause, pelajaran: s.lesson })) };
-      },
-    }),
-
     search_kb: tool({
-      description: "Cari Knowledge Base (KB-…): pelajaran dari case & SIGAP — kategori, root cause, alur penanganan, keputusan, hasil, pelajaran.",
+      description: "Cari Knowledge Base (KB-…): pelajaran dari case — kategori, root cause, alur penanganan, keputusan, hasil, pelajaran.",
       inputSchema: z.object({ q: z.string() }),
       execute: async ({ q }) => {
         const rows = (await listKb()).filter((k) => has([k.code, k.title, k.unit_label, k.category, k.summary, k.root_cause, k.investigation, k.sanction, k.outcome, k.lesson], q));
@@ -142,11 +132,11 @@ export function ldmsTools(canView: (m: Module) => boolean) {
     }),
 
     search_library: tool({
-      description: "Cari Repository: Legal Opinion, memo hukum, resume (LIB-…).",
+      description: "Cari Repository: Legal Opinion, NCP (Non Conformity Policy: penyimpangan kebijakan yang disetujui, dengan masa berlaku & status), memo hukum, resume (LIB-…), termasuk pembaruan tiap dokumen.",
       inputSchema: z.object({ q: z.string().optional(), kind: z.string().optional() }),
       execute: async ({ q, kind }) => {
-        const rows = (await listLibrary()).filter((l) => (!kind || l.kind === kind) && has([l.code, l.kind, l.title, l.parties, l.core, l.key_points, l.outcome], q));
-        return { total: rows.length, rows: rows.slice(0, 15) };
+        const rows = (await listLibrary()).filter((l) => (!kind || l.kind === kind) && has([l.code, l.kind, l.title, l.parties, l.core, l.key_points, l.policy_ref, l.requester, l.status, l.updates_text], q));
+        return { total: rows.length, rows: rows.slice(0, 15).map((l) => ({ id: l.code, jenis: l.kind, tanggal: l.doc_date, judul: l.title, pihak: l.parties, pemohon: l.requester, kebijakanDisimpangi: l.policy_ref, inti: l.core, poin: l.key_points, status: l.status, berlaku: l.valid_from || l.valid_to ? `${l.valid_from ?? "?"} s.d. ${l.valid_to ?? "?"}` : null, jumlahPembaruan: l.update_count, pembaruanTerakhir: l.last_at, olehTerakhir: l.last_by, isiPembaruan: l.updates_text?.slice(0, 1200) ?? null })) };
       },
     }),
 
@@ -183,7 +173,7 @@ export function ldmsTools(canView: (m: Module) => boolean) {
   };
   const need: Record<keyof typeof all, Module | null> = {
     search_permits: "permit", search_agreements: "agreement", get_record: null, search_cases: "cases", case_flow: "cases", case_insight: "cases",
-    search_sigap: "sigap", search_kb: "kb", search_inspections: "inspection", search_library: "library", search_drive: "library", aggregate: "permit",
+    search_kb: "kb", search_inspections: "inspection", search_library: "library", search_drive: "library", aggregate: "permit",
   };
   return Object.fromEntries(Object.entries(all).filter(([k]) => {
     const m = need[k as keyof typeof all];
@@ -195,7 +185,7 @@ export function ldmsTools(canView: (m: Module) => boolean) {
 export const CHAT_SYSTEM = (name: string, today: string) => `Anda asisten pencarian internal LDMS (Legal Document Management System) Boga Group. Pengguna: ${name}. Hari ini ${today} (WIB).
 Gunakan tools untuk mengambil data — jangan menebak. Repository Google Drive tim Legal bisa dicari dengan search_drive.
 Jawab HANYA dari data yang dikembalikan tools. Bila datanya tidak ada, katakan terus terang bahwa data itu belum terekam di LDMS — jangan mengarang nomor izin, id dokumen, tanggal, atau nilai.
-Selalu sebutkan id/nomor dokumen yang relevan (D0123, ULA-004, PKS-002, CASE-2026-002, SGP-2026-001, KB-CASE-2025-004, INS-2025-018, LIB-LO-005) agar bisa dibuka; untuk dokumen Drive sebut nama filenya.
+Selalu sebutkan id/nomor dokumen yang relevan (D0123, ULA-004, PKS-002, CASE-2026-002, KB-CASE-2025-004, INS-2025-018, LIB-LO-005) agar bisa dibuka; untuk dokumen Drive sebut nama filenya.
 Jawaban singkat dan langsung: 1-4 kalimat atau daftar pendek maksimal 8 baris. Bahasa Indonesia. Sebut angka apa adanya dari data.
 Jangan pakai markdown heading atau tabel; boleh daftar dengan tanda hubung.
 Bila pertanyaan menyangkut tenggat, sebutkan sisa hari dan tanggal jatuh temponya sekaligus.

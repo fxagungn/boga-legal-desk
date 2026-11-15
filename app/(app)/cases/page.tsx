@@ -4,7 +4,7 @@ import { pageGuard } from "@/lib/guard";
 import { listMembers } from "@/lib/repo";
 import { listUnits, shortName } from "@/lib/ldms/permits";
 import {
-  CASE_STATUS, DOC_KINDS, getCaseConfig, listCaseDocs, listCases, listSteps, RISK_CHIP, STAGES, STATUS_CHIP, type CaseConfig, type CaseRow,
+  CASE_STATUS, DOC_KINDS, getCaseConfig, listCaseDocs, listCases, listSteps, PROGRESS, progressOf, RISK_CHIP, STAGES, STATUS_CHIP, type CaseConfig, type CaseRow,
 } from "@/lib/ldms/cases";
 import { money } from "@/lib/format";
 import { formatDate } from "@/lib/time";
@@ -60,19 +60,35 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
 
       {rows.length === 0 ? <p className="card px-5 py-10 text-center text-[13.5px] text-ink-2">Belum ada case.</p> : (
         <ul className="card divide-y divide-line-2 overflow-hidden">
-          {rows.map((c) => (
-            <li key={c.id}>
-              <Link href={href({ d: c.code })} scroll={false} className={cx("flex items-center gap-3 px-4 py-3 hover:bg-[#fafbfc] hover:no-underline md:px-5", sel?.id === c.id && "bg-brand-subtle")}>
-                <span className={cx("h-2.5 w-2.5 shrink-0 rounded-full", c.risk === "Tinggi" ? "bg-brand" : c.risk === "Sedang" ? "bg-[#e9a93c]" : "bg-[#bfccc4]")} title={`Risiko ${c.risk}`} />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-bold text-ink">{c.title}</div>
-                  <div className="truncate text-[12px] text-ink-3">{c.category} · {c.unit_name ?? "—"}</div>
-                </div>
-                {c.is_demo && <span className="hidden sm:inline"><DemoBadge /></span>}
-                <span className={cx("shrink-0 rounded-md px-2 py-0.5 text-[11px] font-bold", STATUS_CHIP[c.status])}>{CASE_STATUS[c.status]}</span>
-              </Link>
-            </li>
-          ))}
+          {rows.map((c) => {
+            const at = progressOf(c);
+            const ago = c.last_step_date ? Math.max(0, Math.round((Date.now() - Date.parse(c.last_step_date)) / 86_400_000)) : null;
+            return (
+              <li key={c.id}>
+                <Link href={href({ d: c.code })} scroll={false} className={cx("block px-4 py-3 hover:bg-[#fafbfc] hover:no-underline md:px-5", sel?.id === c.id && "bg-brand-subtle")}>
+                  <div className="flex items-center gap-3">
+                    <span className={cx("h-2.5 w-2.5 shrink-0 rounded-full", c.risk === "Tinggi" ? "bg-brand" : c.risk === "Sedang" ? "bg-[#e9a93c]" : "bg-[#bfccc4]")} title={`Risiko ${c.risk}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-bold text-ink">{c.title}</div>
+                      <div className="truncate text-[12px] text-ink-3">{c.category} · {c.unit_name ?? "—"}</div>
+                    </div>
+                    {c.is_demo && <span className="hidden sm:inline"><DemoBadge /></span>}
+                    <span className={cx("shrink-0 rounded-md px-2 py-0.5 text-[11px] font-bold", STATUS_CHIP[c.status])}>{CASE_STATUS[c.status]}</span>
+                  </div>
+                  <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-[22px]">
+                    <div className="flex w-full max-w-[280px] gap-1" role="img" aria-label={`Progress: langkah ${at + 1} dari ${PROGRESS.length}, ${PROGRESS[at].label}`}>
+                      {PROGRESS.map((p, i) => <span key={p.label} title={p.label} className={cx("h-1.5 flex-1 rounded-full", i <= at ? (c.status === "selesai" ? "bg-ok" : "bg-brand") : "bg-mute-bg")} />)}
+                    </div>
+                    <span className="text-[12px] text-ink-2">
+                      <b className="text-ink">{PROGRESS[at].label}</b> <span className="font-mono text-[11px] text-ink-3">{at + 1}/{PROGRESS.length}</span>
+                      {c.last_handler ? ` · ${c.last_handler}` : ""}{ago !== null ? ` · ${ago === 0 ? "hari ini" : `${ago} hari lalu`}` : ""}
+                      {c.status !== "selesai" && <span className="text-ink-3"> · berjalan {c.age_days} hari</span>}
+                    </span>
+                  </div>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
 

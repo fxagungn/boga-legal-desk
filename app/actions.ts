@@ -51,7 +51,13 @@ export async function login(_: unknown, f: FormData) {
     const mins = Math.ceil((+new Date(m.locked_until) - Date.now()) / 60000);
     return { error: `Terlalu banyak percobaan. Coba lagi dalam ${mins} menit, atau minta Manager Legal me-reset password.` };
   }
-  if (!m.password_hash) return { error: "Akun Anda belum punya password. Minta Manager Legal mengaturnya di Pengaturan." };
+  if (!m.password_hash) {
+    // An account the Legal team created from HR data (Akses user): first password = birth date, read live from the sheet.
+    const set = await firstPasswordFromSheet(m.id, nik, password);
+    if (set !== true) return set;
+    m.password_hash = hashPassword(password);
+    m.must_change_password = true;
+  }
   if (!verifyPassword(password, m.password_hash)) {
     const tries = m.failed_logins + 1;
     await query(
@@ -67,17 +73,31 @@ export async function login(_: unknown, f: FormData) {
   // Until the initial password is changed the session lasts only for this browser session.
   jar.set(SESSION_COOKIE, await signSession(m.id), { ...COOKIE_OPTS, ...(m.must_change_password ? {} : { maxAge: 30 * 86400 }) });
   const next = str(f, "next");
-  const dest = next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  const dest = next.startsWith("/") && !next.startsWith("//") && next !== "/" ? next : "/dashboard";
   redirect(m.must_change_password ? `/ganti-password?next=${encodeURIComponent(dest)}` : dest);
 }
 
 /** A non-Legal employee whose cohorts grant no module cannot sign in. */
 async function viewerWithoutAccess(id: number): Promise<string | null> {
-  const p = await one<{ role: string; nik: string | null; title: string | null; grade: string | null; dept: string | null; division: string | null }>(
-    `select role, nik, title, grade, dept, division from team_members where id = $1`, [id]);
+  const p = await one<{ role: string; nik: string | null; title: string | null; grade: string | null; dept: string | null; division: string | null; perms: Record<string, string[]> | null }>(
+    `select role, nik, title, grade, dept, division, perms from team_members where id = $1`, [id]);
   if (!p || p.role !== "viewer") return null;
+  const none = "Akun Anda belum diberi akses modul LDMS. Hubungi tim Legal.";
+  if (p.perms) return Object.values(p.perms).some((a) => a?.includes("view")) ? null : none;
   const { cohortModules, getCohorts } = await import("@/lib/access");
-  return cohortModules(await getCohorts(), p).size ? null : "Akun Anda belum diberi akses modul LDMS. Hubungi Admin Legal.";
+  return cohortModules(await getCohorts(), p).size ? null : none;
+}
+
+/** Sets the first password of an account that has none, when the typed password equals the birth date in the HR sheet. */
+async function firstPasswordFromSheet(id: number, nik: string, password: string): Promise<true | { error: string }> {
+  const acct = await one<{ role: string }>(`select role from team_members where id = $1`, [id]);
+  if (acct?.role !== "viewer") return { error: "Akun Anda belum punya password. Minta Super Admin mengaturnya di Admin Console." };
+  const { employeeBirth } = await import("@/lib/employees");
+  let birth: string | null = null;
+  try { birth = await employeeBirth(nik); } catch { return { error: "Data karyawan sedang tidak bisa dibaca. Coba lagi beberapa saat." }; }
+  if (!birth || password !== birthPassword(birth)) return { error: "NIK atau password salah." };
+  await query(`update team_members set password_hash = $2, must_change_password = true where id = $1`, [id, hashPassword(password)]);
+  return true;
 }
 
 /**
@@ -103,7 +123,7 @@ async function firstLoginFromCohort(nik: string, password: string, next: string)
   if (!row) return wrong;
   await query(`insert into audit_log (actor, action, entity, entity_id, detail) values ($1,'akun cohort dibuat','team',$2,'login pertama karyawan non-Legal')`, [emp.name, emp.nik]);
   (await cookies()).set(SESSION_COOKIE, await signSession(row.id), COOKIE_OPTS);
-  const dest = next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  const dest = next.startsWith("/") && !next.startsWith("//") && next !== "/" ? next : "/dashboard";
   redirect(`/ganti-password?next=${encodeURIComponent(dest)}`);
 }
 
@@ -122,7 +142,7 @@ export async function changePasswordAction(_: unknown, f: FormData) {
   await query(`update team_members set password_hash = $2, must_change_password = false where id = $1`, [me.id, hashPassword(next)]);
   (await cookies()).set(SESSION_COOKIE, await signSession(me.id), { ...COOKIE_OPTS, maxAge: 30 * 86400 });
   const dest = str(f, "next");
-  redirect(dest.startsWith("/") && !dest.startsWith("//") ? dest : "/");
+  redirect(dest.startsWith("/") && !dest.startsWith("//") && dest !== "/" ? dest : "/dashboard");
 }
 
 export async function logout() {

@@ -73,7 +73,7 @@ export function MobileNav({ badges = {}, allowed, footer }: { badges?: Record<st
   useEffect(() => setOpen(false), [path]);
   const it = navFor(path);
   const tabs = ([
-    { href: "/", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/perizinan", label: "Registry", icon: ShieldCheck },
     { href: "/cases", label: "Cases", icon: FolderKanban },
   ]).filter((t) => allowed.includes(t.href));

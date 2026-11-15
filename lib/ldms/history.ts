@@ -31,13 +31,39 @@ export const listInspections = () => query<InspectionRow>(
    from inspections i left join units u on u.id = i.unit_id left join team_members m on m.id = i.pic_id order by i.insp_date desc`,
 );
 
-export const LIBRARY_KINDS = ["Legal Opinion", "Memo hukum", "Resume"] as const;
-export interface LibraryRow { id: number; code: string; kind: string; doc_date: string | null; title: string; parties: string | null; core: string | null; key_points: string | null; outcome: string | null; file_url: string | null; is_demo: boolean }
+export const LIBRARY_KINDS = ["Legal Opinion", "NCP", "Memo hukum", "Resume"] as const;
+export const LIB_PREFIX: Record<string, string> = { "Legal Opinion": "LIB-LO", NCP: "LIB-NCP", "Memo hukum": "LIB-MM", Resume: "LIB-RES" };
+/** NCP = Non Conformity Policy: an approved deviation from a policy, valid for a period. */
+export const NCP_STATUS = ["Diajukan", "Disetujui", "Ditolak", "Berakhir"] as const;
+export const NCP_CHIP: Record<string, string> = { Diajukan: "bg-info-bg text-info", Disetujui: "bg-ok-bg text-ok", Ditolak: "bg-brand-soft text-brand", Berakhir: "bg-mute-bg text-ink-2" };
+
+export interface LibraryRow {
+  id: number; code: string; kind: string; doc_date: string | null; title: string; parties: string | null; core: string | null; key_points: string | null;
+  outcome: string | null; file_url: string | null; is_demo: boolean;
+  policy_ref: string | null; requester: string | null; valid_from: string | null; valid_to: string | null; status: string | null;
+  created_by: string | null; created_at: string; updated_by: string | null; updated_at: string | null;
+  update_count: number; last_update_at: string | null; last_update_by: string | null; updates_text: string | null;
+  /** Latest activity: newest thread update, else last edit, else creation. */
+  last_at: string; last_by: string | null;
+}
 export const listLibrary = () => query<LibraryRow>(
-  `select id, code, kind, to_char(doc_date,'YYYY-MM-DD') as doc_date, title, parties, core, key_points, outcome, file_url, is_demo from library order by doc_date desc nulls last, code`,
+  `select l.id, l.code, l.kind, to_char(l.doc_date,'YYYY-MM-DD') as doc_date, l.title, l.parties, l.core, l.key_points, l.outcome, l.file_url, l.is_demo,
+     l.policy_ref, l.requester, to_char(l.valid_from,'YYYY-MM-DD') as valid_from, to_char(l.valid_to,'YYYY-MM-DD') as valid_to, l.status,
+     l.created_by, l.created_at, l.updated_by, l.updated_at,
+     coalesce(u.n, 0)::int as update_count, u.last_at as last_update_at, u.last_by as last_update_by, u.txt as updates_text,
+     greatest(coalesce(u.last_at, l.created_at), coalesce(l.updated_at, l.created_at)) as last_at,
+     case when u.last_at is not null and u.last_at >= coalesce(l.updated_at, l.created_at) then u.last_by else coalesce(l.updated_by, l.created_by) end as last_by
+   from library l
+   left join lateral (
+     select count(*) as n, max(created_at) as last_at, (array_agg(by_name order by created_at desc))[1] as last_by, string_agg(coalesce(period,'') || ' ' || body, ' ') as txt
+     from library_updates x where x.library_id = l.id
+   ) u on true
+   order by last_at desc, l.code`,
 );
 
-export const LIB_PREFIX: Record<string, string> = { "Legal Opinion": "LIB-LO", "Memo hukum": "LIB-MM", Resume: "LIB-RES" };
+export interface LibraryUpdate { id: number; period: string | null; body: string; new_status: string | null; by_name: string; created_at: string }
+export const listLibraryUpdates = (id: number) =>
+  query<LibraryUpdate>(`select id, period, body, new_status, by_name, created_at from library_updates where library_id = $1 order by created_at desc, id desc`, [id]);
 
 /* ---------- AI (blueprint §11.3, §15.3, §15.4) ---------- */
 
@@ -49,7 +75,7 @@ export interface AdviceResult {
 const GENERIC = `{"ringkasan":"3-5 kalimat","catatan":"peringatan bila record tidak cukup","keyakinan":"Tinggi|Sedang|Rendah","poin":["..."],"risiko":["..."],"referensi":[{"id":"LIB-…/INS-…","judul":"","kutipan":"verbatim","relevansi":0,"relevan":"1 kalimat"}],"langkah":["langkah konkret + penanggung jawab + tenggat"]}`;
 
 export const LIBRARY_SYSTEM = `Anda penasihat hukum internal Boga Group (F&B multi-brand, 150+ outlet, Indonesia).
-Dasar rekomendasi Anda HANYA: (a) Repository legal opinion & memo yang direkam perusahaan, (b) daftar agreement aktif (MLA, ULA, PKS), (c) Knowledge Base pelajaran dari case & SIGAP, (d) dokumen repository Google Drive bila diberikan. Jangan mengarang id dokumen atau kutipan.
+Dasar rekomendasi Anda HANYA: (a) Repository legal opinion, NCP (Non Conformity Policy) & memo yang direkam perusahaan, termasuk pembaruannya, (b) daftar agreement aktif (MLA, ULA, PKS), (c) Knowledge Base pelajaran dari case, (d) dokumen repository Google Drive bila diberikan. Jangan mengarang id dokumen atau kutipan.
 Wajib menyitir id dokumen nyata (LIB-…, KB-…, MLA/ULA/PKS-…) beserta kutipan verbatim dari field inti/poin/pelajaran.
 Bila record internal tidak memadai untuk isu ini, isi "catatan" dengan peringatan jujur dan turunkan keyakinan.
 Bahasa Indonesia formal-legal, ringkas, actionable. Status rekomendasi adalah draft untuk approval Legal Supervisor.

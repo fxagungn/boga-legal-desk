@@ -29,7 +29,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
         <span className="mx-auto grid h-11 w-11 place-items-center rounded-[11px] bg-brand text-[16px] font-extrabold text-white" aria-hidden="true">BG</span>
         <h1 className="mt-4 text-[17px] font-extrabold">{ok ? "Acknowledge tercatat" : "Tidak bisa diproses"}</h1>
         <p className="mt-2 text-[13.5px] text-ink-2">{msg}</p>
-        <a href="/" className="btn btn-primary mt-5">Buka LDMS</a>
+        <a href="/dashboard" className="btn btn-primary mt-5">Buka LDMS</a>
       </div>
     </div>
   );

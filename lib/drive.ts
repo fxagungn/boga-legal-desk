@@ -69,12 +69,11 @@ export async function mirrorToDrive() {
        from cases c left join units u on u.id = c.unit_id left join team_members m on m.id = c.pic_id order by c.code`),
     tab("Case_Flow", `select c.code, s.step_date, s.stage, s.handler, s.action, s.by_name from case_steps s join cases c on c.id = s.case_id order by c.code, s.step_date, s.id`),
     tab("Case_Files", `select c.code, d.kind, d.label, d.url, d.doc_date, d.by_name from case_docs d join cases c on c.id = d.case_id order by c.code, d.id`),
-    tab("SIGAP", `select s.code, s.ref, s.result_date, u.name as unit, s.category, s.violation, s.decision, s.root_cause, s.lesson, s.kb_code
-       from sigap_results s left join units u on u.id = s.unit_id order by s.result_date desc`),
     tab("Knowledge_Base", `select code, case_date, title, unit_label, category, summary, root_cause, investigation as alur, sanction as keputusan, outcome, lesson, source from kb_cases order by case_date desc nulls last`),
     tab("Inspections", `select i.code, i.insp_date, i.agency, i.kind, u.name as unit, i.result, i.findings, i.follow_up, i.consequence, i.fine, m.name as pic_legal, i.closed_at, i.next_expected
        from inspections i left join units u on u.id = i.unit_id left join team_members m on m.id = i.pic_id order by i.insp_date desc`),
-    tab("Library", `select code, kind, doc_date, title, parties, core, key_points, outcome, file_url from library order by code`),
+    tab("Repository", `select code, kind, doc_date, title, parties, requester, policy_ref, core, key_points, status, valid_from, valid_to, file_url, created_by, created_at, updated_by, updated_at from library order by code`),
+    tab("Repository_Updates", `select l.code, x.period, x.body, x.new_status, x.by_name, x.created_at from library_updates x join library l on l.id = x.library_id order by l.code, x.created_at`),
     tab("ReminderLog", `select entity, entity_id, stage, stage_key, to_list, cc_list, status, sent_at from reminders order by sent_at desc limit 5000`),
     tab("AI_Audit", `select id, module, actor, at, model, ok, confidence, refs, decided_value, decided_by from ai_runs order by at desc limit 2000`),
     tab("AuditTrail", `select at, actor, action, entity, entity_id, detail from audit_log order by at desc limit 5000`),

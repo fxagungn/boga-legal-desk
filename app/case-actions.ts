@@ -1,5 +1,5 @@
 "use server";
-// Data Record › Cases and SIGAP.
+// Data Record › Cases.
 import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 import { one, query } from "@/lib/db";
@@ -7,7 +7,6 @@ import { requireMember } from "@/lib/repo";
 import { requireCan } from "@/lib/access";
 import { audit } from "@/lib/ldms/permits";
 import { CASE_STATUS, DOC_KINDS, getCaseConfig, nextCaseCode, publishCaseToKb, STAGES } from "@/lib/ldms/cases";
-import { nextSigapCode, publishSigapToKb } from "@/lib/ldms/sigap";
 import { appendCaseToKb } from "@/lib/drive";
 import type { Result } from "@/app/actions";
 
@@ -173,30 +172,5 @@ export async function reopenCaseAction(_: Result, f: FormData): Promise<Result> 
     await query(`update cases set kb_code = null where id = $1`, [id]);
     await audit(me, "buka kembali case", "case", c?.code ?? id);
     refresh();
-  });
-}
-
-/* ---------- SIGAP ---------- */
-
-export async function saveSigapAction(_: Result, f: FormData): Promise<Result> {
-  return run(async () => {
-    const me = await requireMember();
-    await requireCan(me, "sigap", "edit");
-    const violation = str(f, "violation");
-    const date = isoDate(str(f, "result_date"));
-    if (!violation || !date) throw new Error("Isi tanggal dan pelanggaran.");
-    const code = await nextSigapCode();
-    const r = await one<{ id: number }>(
-      `insert into sigap_results (code, ref, result_date, unit_id, category, violation, decision, root_cause, lesson, updated_by)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id`,
-      [code, nul(str(f, "ref")), date, Number(str(f, "unit_id")) || null, nul(str(f, "category")), violation, nul(str(f, "decision")),
-        nul(str(f, "root_cause")), nul(str(f, "lesson")), me.name],
-    );
-    const kb = await publishSigapToKb(r!.id);
-    if (kb) await toKbDoc(kb);
-    await audit(me, "catat hasil SIGAP", "sigap", code, violation);
-    revalidatePath("/sigap");
-    revalidatePath("/kb");
-    return `${code} tercatat${kb ? ` · masuk Knowledge Base` : ""}`;
   });
 }

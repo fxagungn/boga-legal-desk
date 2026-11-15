@@ -16,12 +16,8 @@ export interface Flows {
     agreementStages: number[];
   };
   sigap: {
-    /** URL of the SIGAP system, shown embedded in Data Record › SIGAP. */
+    /** Address of the SIGAP web app (a separate system with its own login). The portal's SIGAP card opens it. */
     url: string;
-    /** Open in a new tab instead of embedding (for systems that block iframes). */
-    newTab: boolean;
-    /** Violation categories offered when recording a SIGAP result. */
-    categories: string[];
   };
   ai: {
     enabled: boolean;
@@ -37,9 +33,12 @@ export interface Flows {
   };
 }
 
+/** SIGAP (Google Apps Script). Admin Console can replace it, e.g. after a new Apps Script deployment. */
+export const SIGAP_URL = "https://script.google.com/macros/s/AKfycbwAyEHWGU-JM9ZgXojnl4nImKKFTDZRmrAbQCNMidciqMr21cgm_shRgQWvqyq_sZYH/exec";
+
 export const DEFAULT_FLOWS: Flows = {
   reminder: { sendEnabled: false, supervisorId: null, corpSupervisorId: null, headId: null, directorId: null, digestEnabled: true, agreementStages: [60, 30, 7] },
-  sigap: { url: "", newTab: false, categories: ["Kepatuhan SOP", "Fraud & kriminal", "Keamanan pangan", "Produktivitas & tanggung jawab", "Perilaku & etika", "K3"] },
+  sigap: { url: SIGAP_URL },
   ai: { enabled: true, model: "claude-sonnet-5-5" },
   drive: { folderUrl: "", folderId: "", dbSheetId: "", kbDocId: "", mirrorEnabled: true },
 };
@@ -48,7 +47,7 @@ export async function getFlows(): Promise<Flows> {
   const v = (await getKV<Partial<Flows>>("flows")) ?? {};
   return {
     reminder: { ...DEFAULT_FLOWS.reminder, ...(v.reminder ?? {}) },
-    sigap: { ...DEFAULT_FLOWS.sigap, ...(v.sigap ?? {}) },
+    sigap: { url: v.sigap?.url || SIGAP_URL },
     ai: { ...DEFAULT_FLOWS.ai, ...(v.ai ?? {}) },
     drive: { ...DEFAULT_FLOWS.drive, ...(v.drive ?? {}) },
   };
@@ -58,7 +57,7 @@ export async function saveFlows(patch: { [K in keyof Flows]?: Partial<Flows[K]> 
   const cur = await getFlows();
   const next: Flows = {
     reminder: { ...cur.reminder, ...(patch.reminder ?? {}) },
-    sigap: { ...cur.sigap, ...(patch.sigap ?? {}) },
+    sigap: { url: patch.sigap?.url ?? cur.sigap.url },
     ai: { ...cur.ai, ...(patch.ai ?? {}) },
     drive: { ...cur.drive, ...(patch.drive ?? {}) },
   };

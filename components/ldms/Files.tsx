@@ -8,7 +8,7 @@ import { SectionTitle } from "@/components/ldms/bits";
 import { uploadRecordFileAction } from "@/app/permit-actions";
 
 /** Attachments of an agreement or inspection. Files older than the retention period are removed by the daily job. */
-export async function FilesSection({ entity, id, editable }: { entity: "agreement" | "inspection"; id: number; editable: boolean }) {
+export async function FilesSection({ entity, id, editable }: { entity: "agreement" | "inspection" | "library"; id: number; editable: boolean }) {
   const files = await listFiles(entity, id);
   return (
     <section>

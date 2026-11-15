@@ -5,9 +5,8 @@ import { listAgreements } from "./agreements";
 import { CASE_STATUS, listCases } from "./cases";
 import { listInspections, listKb, listLibrary } from "./history";
 import { inWindow, listPermits, needsAck, RENEWAL_LABEL, shortName } from "./permits";
-import { listSigap } from "./sigap";
 
-export const SEARCH_MODULES = ["Permit", "Perjanjian", "Pemeriksaan", "Cases", "SIGAP", "Repository", "Knowledge Base"] as const;
+export const SEARCH_MODULES = ["Permit", "Perjanjian", "Pemeriksaan", "Cases", "Repository", "Knowledge Base"] as const;
 
 export interface SearchRow {
   module: (typeof SEARCH_MODULES)[number];
@@ -26,11 +25,10 @@ export interface SearchRow {
 const none = <T,>(): Promise<T[]> => Promise.resolve([]);
 
 export async function searchRows(canView: (m: Module) => boolean): Promise<SearchRow[]> {
-  const [permits, agreements, cases, sigap, kb, ins, lib, notes] = await Promise.all([
+  const [permits, agreements, cases, kb, ins, lib, notes] = await Promise.all([
     canView("permit") ? listPermits() : none<Awaited<ReturnType<typeof listPermits>>[number]>(),
     canView("agreement") ? listAgreements() : none<Awaited<ReturnType<typeof listAgreements>>[number]>(),
     canView("cases") ? listCases() : none<Awaited<ReturnType<typeof listCases>>[number]>(),
-    canView("sigap") ? listSigap() : none<Awaited<ReturnType<typeof listSigap>>[number]>(),
     canView("kb") ? listKb() : none<Awaited<ReturnType<typeof listKb>>[number]>(),
     canView("inspection") ? listInspections() : none<Awaited<ReturnType<typeof listInspections>>[number]>(),
     canView("library") ? listLibrary() : none<Awaited<ReturnType<typeof listLibrary>>[number]>(),
@@ -63,12 +61,6 @@ export async function searchRows(canView: (m: Module) => boolean): Promise<Searc
       text: [c.code, c.title, c.category, c.unit_name, c.counterparty, c.forum, c.chronology, c.root_cause_cat, c.root_cause, c.decision, c.outcome, c.lesson].filter(Boolean).join(" "),
     });
   }
-  for (const s of sigap) {
-    rows.push({
-      ...base, module: "SIGAP", code: s.code, title: s.violation, sub: `${s.unit_name ?? "-"} · ${s.result_date}`, meta: s.decision ?? "", days: null, href: `/sigap?tab=hasil`,
-      text: [s.code, s.ref, s.violation, s.category, s.unit_name, s.decision, s.root_cause, s.lesson].filter(Boolean).join(" "),
-    });
-  }
   for (const k of kb) {
     rows.push({
       ...base, module: "Knowledge Base", code: k.code, title: k.title, sub: [k.category, k.unit_label].filter(Boolean).join(" · "), meta: k.outcome ?? "", days: null,
@@ -88,7 +80,7 @@ export async function searchRows(canView: (m: Module) => boolean): Promise<Searc
     rows.push({
       ...base, module: "Repository", code: l.code, title: l.title, sub: [l.kind, l.parties].filter(Boolean).join(" · "), meta: l.doc_date ?? "", days: null,
       href: `/repository?d=${l.code}`,
-      text: [l.code, l.kind, l.title, l.parties, l.core, l.key_points, l.outcome].filter(Boolean).join(" "),
+      text: [l.code, l.kind, l.title, l.parties, l.core, l.key_points, l.policy_ref, l.requester, l.status, l.updates_text].filter(Boolean).join(" "),
     });
   }
   return rows;

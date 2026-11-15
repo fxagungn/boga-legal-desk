@@ -33,21 +33,40 @@ export function extractJson<T>(t: string): T {
   return JSON.parse(t.slice(a, b + 1)) as T;
 }
 
-/** One-shot JSON call (Terapkan Matrix, verifikasi sanksi, Library, Inspection). */
-export async function aiJson<T>(me: Pick<Member, "id" | "name"> | null, module: string, system: string, user: string, maxOutputTokens = 3000): Promise<{ data: T; runId: string | null }> {
+/**
+ * One-shot JSON call (Repository consult, inspection prep).
+ * The model sometimes answers with a cut-off or non-JSON reply. So: generous token limit, one stricter retry,
+ * and — when a `fallback` is given — the plain text is shown instead of an error.
+ */
+export async function aiJson<T>(me: Pick<Member, "id" | "name"> | null, module: string, system: string, user: string, maxOutputTokens = 6000, fallback?: (text: string) => T): Promise<{ data: T; runId: string | null }> {
   const ready = await aiReady();
   if (!ready.ok) throw new Error(ready.reason);
+  const attempts: string[] = [];
+  let lastText = "";
   try {
-    const r = await generateText({ model: aiModel(ready.model), system, prompt: user, maxOutputTokens });
-    const data = extractJson<T>(r.text);
-    const conf = (data as { keyakinan?: string; keyakinanLabel?: string }).keyakinan ?? (data as { keyakinanLabel?: string }).keyakinanLabel;
-    const refs = ((data as { referensi?: { id?: string }[]; dasar?: { kode?: string }[] }).referensi ?? []).map((x) => x.id ?? "").filter(Boolean)
-      .concat(((data as { dasar?: { kode?: string }[] }).dasar ?? []).map((x) => x.kode ?? "").filter(Boolean));
-    const runId = await logAi(me, module, { system: system.slice(0, 400), user: user.slice(0, 20_000) }, data, { model: ready.model, confidence: conf, refs });
+    let data: T | null = null;
+    for (const [i, extra] of ["", "\n\nPENTING: balas HANYA satu objek JSON valid sesuai format, tanpa teks pembuka, tanpa markdown, dan pastikan JSON ditutup lengkap. Ringkas bila perlu."].entries()) {
+      const r = await generateText({ model: aiModel(ready.model), system, prompt: user + extra, maxOutputTokens: maxOutputTokens * (i + 1) });
+      lastText = r.text ?? "";
+      try {
+        data = extractJson<T>(lastText);
+        break;
+      } catch (e) {
+        attempts.push(`percobaan ${i + 1}: ${e instanceof Error ? e.message : e} (finish=${r.finishReason}, ${lastText.length} karakter)`);
+      }
+    }
+    if (data === null) {
+      if (!fallback || !lastText.trim()) throw new Error(`Format jawaban AI tidak terbaca — ${attempts.join("; ")}`);
+      data = fallback(lastText.trim());
+    }
+    const conf = (data as { keyakinan?: string }).keyakinan;
+    const refs = ((data as { referensi?: { id?: string }[] }).referensi ?? []).map((x) => x.id ?? "").filter(Boolean);
+    const runId = await logAi(me, module, { system: system.slice(0, 400), user: user.slice(0, 20_000) }, data, { model: ready.model, confidence: conf, refs, error: attempts.length ? attempts.join("; ").slice(0, 500) : undefined });
     return { data, runId };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    await logAi(me, module, { user: user.slice(0, 4000) }, null, { model: ready.model, ok: false, error: msg.slice(0, 500) });
-    throw new Error(`AI gagal: ${msg.slice(0, 200)}`);
+    await logAi(me, module, { user: user.slice(0, 4000) }, lastText ? { raw: lastText.slice(0, 4000) } : null, { model: ready.model, ok: false, error: msg.slice(0, 500) });
+    console.error(`[ai:${module}]`, msg);
+    throw new Error("AI belum bisa menyusun rekomendasi. Coba lagi sebentar; bila berulang, cek Admin Console › AI › Log AI.");
   }
 }

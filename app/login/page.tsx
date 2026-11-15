@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   if (!hasDb()) redirect("/setup");
   const settings = await getSettings();
-  const { next = "/" } = await searchParams;
+  const { next = "/dashboard" } = await searchParams;
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg px-5 py-10">
       <div className="w-full max-w-[440px]">
@@ -25,7 +25,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           {settings.uatMode && <p className="mb-4 rounded-lg bg-info-bg px-3 py-2 text-[13px] text-info">Mode UAT aktif: ini lingkungan uji coba.</p>}
           <LoginForm next={next} />
         </div>
-        <p className="mt-4 text-center text-[11.5px] leading-relaxed text-ink-3">Lupa password atau belum punya akses? Hubungi tim Legal.</p>
+        <p className="mt-4 text-center text-[11.5px] leading-relaxed text-ink-3">Lupa password atau belum punya akses? Hubungi tim Legal. · <a href="/" className="font-semibold">← Pilih sistem</a></p>
       </div>
     </div>
   );

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function ChangePassword({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const me = await currentMember();
   if (!me) redirect("/login");
-  const { next = "/" } = await searchParams;
+  const { next = "/dashboard" } = await searchParams;
   return (
     <div className="grid min-h-screen place-items-center px-4 py-10">
       <div className="card w-full max-w-sm p-7">
@@ -27,7 +27,7 @@ export default async function ChangePassword({ searchParams }: { searchParams: P
               <button className="font-semibold text-brand hover:underline">Keluar &amp; masuk dengan akun lain</button>
             </form>
           ) : (
-            <Link href="/" className="font-semibold text-brand hover:underline">← Kembali ke beranda</Link>
+            <Link href="/dashboard" className="font-semibold text-brand hover:underline">← Kembali ke beranda</Link>
           )}
         </div>
       </div>

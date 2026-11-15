@@ -14,14 +14,13 @@ const SUGGESTIONS = [
   "Temuan Disnakertrans apa yang berulang?",
 ];
 
-const ID_RE = /\b(D\d{4}|(?:MLA|ULA|PKS)-\d{3}|KB-(?:CASE-|SGP-)?\d{4}-\d{3}|CASE-\d{4}-\d{3}|SGP-\d{4}-\d{3}|INS-\d{4}-\d{3}|LIB-[A-Z]{2,3}-\d{3})\b/g;
+const ID_RE = /\b(D\d{4}|(?:MLA|ULA|PKS)-\d{3}|KB-(?:CASE-|SGP-)?\d{4}-\d{3}|CASE-\d{4}-\d{3}|INS-\d{4}-\d{3}|LIB-[A-Z]{2,3}-\d{3})\b/g;
 
 function hrefFor(id: string) {
   if (/^D\d/.test(id)) return `/perizinan?pic=all&d=${id}`;
   if (/^(MLA|ULA|PKS)-/.test(id)) return `/perjanjian?tab=${id.slice(0, 3)}&d=${id}`;
   if (id.startsWith("KB-")) return `/kb?d=${id}`;
   if (id.startsWith("CASE-")) return `/cases?s=semua&d=${id}`;
-  if (id.startsWith("SGP-")) return `/sigap?tab=hasil`;
   if (id.startsWith("INS-")) return `/pemeriksaan?d=${id}`;
   return `/repository?d=${id}`;
 }

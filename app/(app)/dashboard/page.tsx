@@ -20,7 +20,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const canView = (m: Parameters<typeof can>[2]) => can(access, me, m, "view");
   if (!canView("dashboard")) {
     // Not everyone gets the dashboard (e.g. a cohort that only reads the Knowledge Base): open their first module instead.
-    const first = NAV_ITEMS.find((i) => i.href !== "/" && (i.superAdmin ? isSuperAdmin(me) : !i.module || canView(i.module)));
+    const first = NAV_ITEMS.find((i) => i.href !== "/dashboard" && !i.legal && (i.superAdmin ? isSuperAdmin(me) : !i.module || canView(i.module)));
     redirect(first?.href ?? "/settings");
   }
   const sp = await searchParams;

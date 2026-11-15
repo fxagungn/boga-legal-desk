@@ -11,7 +11,7 @@ export function AdviceView({ r }: { r: AdviceResult }) {
         <span className="rounded-md bg-warn-bg px-2 py-0.5 text-[11px] font-bold text-warn">DRAFT</span>
         <span className="text-[12px] font-semibold text-ink-2">Keyakinan: {r.keyakinan}</span>
       </div>
-      <p>{r.ringkasan}</p>
+      <p className="whitespace-pre-line">{r.ringkasan}</p>
       {r.catatan && <p className="rounded-lg border border-warn/20 bg-warn-bg px-3 py-2 text-[12.5px] text-warn">{r.catatan}</p>}
       {r.poin?.length > 0 && <div><h4 className="font-extrabold">Poin</h4><ul className="mt-1 list-disc space-y-0.5 pl-4 text-ink-2">{r.poin.map((x, i) => <li key={i}>{x}</li>)}</ul></div>}
       {r.risiko?.length > 0 && <div><h4 className="font-extrabold">Risiko</h4><ul className="mt-1 list-disc space-y-0.5 pl-4 text-ink-2">{r.risiko.map((x, i) => <li key={i}>{x}</li>)}</ul></div>}

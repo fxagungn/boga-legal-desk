@@ -16,7 +16,6 @@ export const MODULES = {
   agreement: "MLA · ULA · PKS",
   inspection: "Government Inspection",
   cases: "Cases",
-  sigap: "SIGAP",
   library: "Repository",
   kb: "Knowledge Base",
   reminder: "Reminder Engine",
@@ -41,7 +40,6 @@ export const DEFAULT_ACCESS: AccessMatrix = {
   inspection: { view: ALL, edit: ALL, approve: LEAD },
   // approve = close a case and publish it to the Knowledge Base
   cases: { view: ALL, edit: ALL, approve: LEAD },
-  sigap: { view: ALL, edit: ALL, approve: LEAD },
   library: { view: ALL, edit: ALL, approve: LEAD },
   kb: { view: ALL, edit: ALL, approve: LEAD },
   // approve = run the reminder scan / send manually
@@ -124,10 +122,28 @@ export const getAccessCtx = cache(async (): Promise<AccessCtx> => {
   return { matrix, cohorts };
 });
 
+/**
+ * 1. Super Admin: everything. 2. An account with a personal checklist: exactly that checklist.
+ * 3. Otherwise: the role matrix (Legal team) or the cohorts (other employees).
+ */
 export function can(a: AccessCtx, me: Member & Person, module: Module, action: Action = "view"): boolean {
   if (isSuperAdmin(me)) return true;
+  if (me.perms) return Boolean(me.perms[module]?.includes(action));
   if (me.role !== "viewer" && a.matrix[module][action].includes(me.role)) return true;
   return a.cohorts.some((c) => inCohort(c, me) && Boolean(c.perms[module]?.includes(action)));
+}
+
+/** The Legal team (any Legal role) and Super Admin manage who can open what. */
+export const isLegal = (m: Pick<Member, "role" | "nik"> & { is_super_admin?: boolean }) => m.role !== "viewer" || isSuperAdmin(m);
+
+/**
+ * Legal may set access for accounts outside the Legal team. Only a Super Admin may change a Legal colleague's access;
+ * nobody edits a Super Admin's or (unless Super Admin) their own.
+ */
+export function canSetAccessOf(me: Member, target: Member): boolean {
+  if (isSuperAdmin(target)) return false;
+  if (isSuperAdmin(me)) return true;
+  return isLegal(me) && target.role === "viewer" && target.id !== me.id;
 }
 
 /** Throws when the signed-in member lacks the permission. */

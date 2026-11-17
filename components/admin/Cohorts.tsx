@@ -80,7 +80,7 @@ function CohortForm({ c, grades }: { c: Cohort; grades: string[] }) {
       <input type="hidden" name="cid" value={c.id} />
       <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
         <div><label className="label" htmlFor={`co-n-${k}`}>Nama cohort</label><input id={`co-n-${k}`} name="name" defaultValue={c.name} required placeholder="mis. Leader outlet, Area Manager" className="input" /></div>
-        <label className="flex items-center gap-2 pb-2 text-[13px] font-semibold"><input type="checkbox" name="enabled" defaultChecked={c.enabled} className="h-4 w-4 accent-[#c41e29]" /> Aktif</label>
+        <label className="flex items-center gap-2 pb-2 text-[13px] font-semibold"><input type="checkbox" name="enabled" defaultChecked={c.enabled} className="h-4 w-4 accent-[#1d4ed8]" /> Aktif</label>
       </div>
 
       <fieldset>
@@ -89,7 +89,7 @@ function CohortForm({ c, grades }: { c: Cohort; grades: string[] }) {
           <div className="flex flex-wrap gap-1.5">
             {grades.map((g) => (
               <label key={g} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 py-1 text-[12.5px] has-[:checked]:border-brand-line has-[:checked]:bg-brand-subtle">
-                <input type="checkbox" name="grades" value={g} defaultChecked={c.grades.includes(g)} className="accent-[#c41e29]" /> {g}
+                <input type="checkbox" name="grades" value={g} defaultChecked={c.grades.includes(g)} className="accent-[#1d4ed8]" /> {g}
               </label>
             ))}
           </div>
@@ -112,7 +112,7 @@ function CohortForm({ c, grades }: { c: Cohort; grades: string[] }) {
                 <tr key={m}>
                   <td className="px-3 py-1.5">{MODULES[m]}</td>
                   {(Object.keys(ACTIONS) as Action[]).map((a) => (
-                    <td key={a} className="px-2 py-1.5 text-center"><input type="checkbox" name={`p.${m}.${a}`} defaultChecked={Boolean(c.perms[m]?.includes(a))} aria-label={`${MODULES[m]} — ${ACTIONS[a]}`} className="h-4 w-4 accent-[#c41e29]" /></td>
+                    <td key={a} className="px-2 py-1.5 text-center"><input type="checkbox" name={`p.${m}.${a}`} defaultChecked={Boolean(c.perms[m]?.includes(a))} aria-label={`${MODULES[m]} — ${ACTIONS[a]}`} className="h-4 w-4 accent-[#1d4ed8]" /></td>
                   ))}
                 </tr>
               ))}

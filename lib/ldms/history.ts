@@ -17,7 +17,7 @@ export const listKb = () => query<KbCase>(
 
 export const INSPECTION_RESULTS = ["Sesuai", "Temuan minor", "Temuan mayor", "Sanksi administratif"] as const;
 export const RESULT_CHIP: Record<string, string> = {
-  Sesuai: "bg-ok-bg text-ok", "Temuan minor": "bg-[#fff4e2] text-[#8a5a0b]", "Temuan mayor": "bg-[#fde7e9] text-[#a5161f]", "Sanksi administratif": "bg-brand text-white",
+  Sesuai: "bg-ok-bg text-ok", "Temuan minor": "bg-[#fff4e2] text-[#8a5a0b]", "Temuan mayor": "bg-[#fde7e9] text-[#a5161f]", "Sanksi administratif": "bg-danger text-white",
 };
 
 export interface InspectionRow {
@@ -35,7 +35,7 @@ export const LIBRARY_KINDS = ["Legal Opinion", "NCP", "Memo hukum", "Resume"] as
 export const LIB_PREFIX: Record<string, string> = { "Legal Opinion": "LIB-LO", NCP: "LIB-NCP", "Memo hukum": "LIB-MM", Resume: "LIB-RES" };
 /** NCP = Non Conformity Policy: an approved deviation from a policy, valid for a period. */
 export const NCP_STATUS = ["Diajukan", "Disetujui", "Ditolak", "Berakhir"] as const;
-export const NCP_CHIP: Record<string, string> = { Diajukan: "bg-info-bg text-info", Disetujui: "bg-ok-bg text-ok", Ditolak: "bg-brand-soft text-brand", Berakhir: "bg-mute-bg text-ink-2" };
+export const NCP_CHIP: Record<string, string> = { Diajukan: "bg-info-bg text-info", Disetujui: "bg-ok-bg text-ok", Ditolak: "bg-danger-soft text-danger", Berakhir: "bg-mute-bg text-ink-2" };
 
 export interface LibraryRow {
   id: number; code: string; kind: string; doc_date: string | null; title: string; parties: string | null; core: string | null; key_points: string | null;

@@ -137,8 +137,8 @@ export default async function Perizinan({ searchParams }: { searchParams: Promis
                       <div className="truncate font-bold text-ink">{p.type_name}</div>
                       <div className="truncate text-[12.5px] text-ink-3">{p.unit_name}</div>
                     </div>
-                    {needsAck(p) && <span title="Somasi belum acknowledge" className="chip h-6 shrink-0 bg-brand px-1.5 text-white"><AlertTriangle size={13} /><span className="hidden sm:inline">Somasi</span></span>}
-                    <span className="hidden w-[110px] shrink-0 text-right text-[12.5px] md:block"><RenewalCell p={p} /></span>
+                    {needsAck(p) && <span title="Somasi belum acknowledge" className="chip h-6 shrink-0 bg-danger px-1.5 text-white"><AlertTriangle size={13} /><span className="hidden sm:inline">Somasi</span></span>}
+                    <span className="hidden w-[170px] shrink-0 text-right text-[12.5px] whitespace-nowrap md:block"><RenewalCell p={p} /></span>
                     <span className={cx("inline-block w-[92px] shrink-0 rounded-md px-2 py-[3px] text-center font-mono text-[11px] font-semibold whitespace-nowrap", TIME_CHIP[timeStatus(p.days)])}>{daysText(p.days)}</span>
                   </Link>
                 </li>
@@ -155,6 +155,6 @@ export default async function Perizinan({ searchParams }: { searchParams: Promis
 
 function RenewalCell({ p }: { p: PermitRow }) {
   if (!inWindow(p) && p.renewal_status === "belum") return <span className="text-ink-3">Aktif</span>;
-  const tone = p.renewal_status === "submitted" ? "text-info" : p.renewal_status === "proses" ? "text-ink" : "text-brand";
+  const tone = p.renewal_status === "submitted" ? "text-info" : p.renewal_status === "proses" ? "text-ink" : "text-danger";
   return <span className={cx("font-semibold", tone)}>{RENEWAL_LABEL[p.renewal_status]}</span>;
 }

@@ -15,7 +15,7 @@ import { addCaseDocAction, addCaseStepAction, closeCaseAction, reopenCaseAction,
 
 export const dynamic = "force-dynamic";
 
-type SP = { s?: string; cat?: string; q?: string; d?: string };
+type SP = { s?: string; cat?: string; q?: string; d?: string; new?: string };
 
 export default async function Page({ searchParams }: { searchParams: Promise<SP> }) {
   const { me, can } = await pageGuard("cases");
@@ -28,7 +28,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
   const sel = sp.d ? all.find((c) => c.code.toUpperCase() === sp.d!.toUpperCase()) ?? null : null;
   const href = (patch: Partial<SP>) => {
     const p = new URLSearchParams();
-    for (const [k, v] of Object.entries({ ...sp, ...patch })) if (v) p.set(k, v);
+    for (const [k, v] of Object.entries({ ...sp, new: undefined, ...patch })) if (v) p.set(k, v);
     return `/cases${p.size ? `?${p}` : ""}`;
   };
   const editable = can("cases", "edit");
@@ -52,7 +52,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
           <button className="btn btn-sm h-9">Cari</button>
         </form>
         {editable && (
-          <ActionDialog action={saveCaseAction} id={0} wide trigger={<><Plus size={16} /> Case baru</>} triggerClass="btn btn-primary" title="Catat case baru" submit="Simpan">
+          <ActionDialog action={saveCaseAction} id={0} wide autoOpen={sp.new === "1"} trigger={<><Plus size={16} /> Case baru</>} triggerClass="btn btn-primary" title="Catat case baru" submit="Simpan">
             <CaseFields cfg={cfg} units={units} members={members} meId={me.id} />
           </ActionDialog>
         )}
@@ -67,7 +67,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<SP>
               <li key={c.id}>
                 <Link href={href({ d: c.code })} scroll={false} className={cx("block px-4 py-3 hover:bg-[#fafbfc] hover:no-underline md:px-5", sel?.id === c.id && "bg-brand-subtle")}>
                   <div className="flex items-center gap-3">
-                    <span className={cx("h-2.5 w-2.5 shrink-0 rounded-full", c.risk === "Tinggi" ? "bg-brand" : c.risk === "Sedang" ? "bg-[#e9a93c]" : "bg-[#bfccc4]")} title={`Risiko ${c.risk}`} />
+                    <span className={cx("h-2.5 w-2.5 shrink-0 rounded-full", c.risk === "Tinggi" ? "bg-danger" : c.risk === "Sedang" ? "bg-[#e9a93c]" : "bg-[#bfccc4]")} title={`Risiko ${c.risk}`} />
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-bold text-ink">{c.title}</div>
                       <div className="truncate text-[12px] text-ink-3">{c.category} · {c.unit_name ?? "—"}</div>

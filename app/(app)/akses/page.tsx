@@ -35,7 +35,7 @@ function Checklist({ k, checked }: { k: string; checked: (m: Module, a: Action) 
               <td className="px-3 py-1.5">{MODULES[m]}</td>
               {ACTS.map((a) => (
                 <td key={a} className="px-2 py-1.5 text-center">
-                  <input type="checkbox" name={`p.${m}.${a}`} defaultChecked={checked(m, a)} aria-label={`${MODULES[m]} — ${ACTIONS[a]}`} id={`${k}-${m}-${a}`} className="h-4 w-4 accent-[#c41e29]" />
+                  <input type="checkbox" name={`p.${m}.${a}`} defaultChecked={checked(m, a)} aria-label={`${MODULES[m]} — ${ACTIONS[a]}`} id={`${k}-${m}-${a}`} className="h-4 w-4 accent-[#1d4ed8]" />
                 </td>
               ))}
             </tr>
@@ -63,7 +63,7 @@ function Row({ m, me, access }: { m: Member; me: Member; access: AccessCtx }) {
         <div className="flex shrink-0 flex-wrap gap-2">
           <ActionDialog action={saveUserAccessAction} id={m.id} wide trigger="Atur akses" triggerClass="btn btn-sm" title={`Akses ${m.name}`} desc={legal ? "Checklist ini menggantikan hak dari perannya." : "Centang modul yang boleh dibuka."} submit="Simpan akses">
             <Checklist k={`u${m.id}`} checked={(mod, a) => can(access, m, mod, a)} />
-            {m.perms && <label className="mt-3 flex items-center gap-2 text-[13px]"><input type="checkbox" name="mode" value="default" className="h-4 w-4 accent-[#c41e29]" /> Hapus checklist pribadi (kembali ikut {legal ? "peran" : "cohort"})</label>}
+            {m.perms && <label className="mt-3 flex items-center gap-2 text-[13px]"><input type="checkbox" name="mode" value="default" className="h-4 w-4 accent-[#1d4ed8]" /> Hapus checklist pribadi (kembali ikut {legal ? "peran" : "cohort"})</label>}
           </ActionDialog>
           {!legal && <ActionButton action={toggleUserAction} id={m.id} className="btn btn-ghost btn-sm">{m.active ? "Nonaktifkan" : "Aktifkan"}</ActionButton>}
         </div>

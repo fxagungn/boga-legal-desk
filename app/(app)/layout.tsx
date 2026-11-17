@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
-import { FlaskConical, KeyRound, Wrench } from "lucide-react";
+import { FlaskConical, KeyRound, LayoutGrid, Wrench } from "lucide-react";
+import { BrandMark } from "@/components/BrandMark";
+import { CommandPalette } from "@/components/CommandPalette";
 import { getSettings, query } from "@/lib/db";
 import { MobileNav, SideNav, TopBar } from "@/components/Nav";
 import { Toaster } from "@/components/actions";
-import { canBypassMaintenance, currentMember } from "@/lib/repo";
+import { canBypassMaintenance, currentMember, sessionMemberId } from "@/lib/repo";
 import { ROLE_LABEL } from "@/lib/workflow";
 import { logout } from "@/app/actions";
 import { initials } from "@/lib/format";
@@ -15,16 +17,20 @@ import { NavProgress } from "@/components/NavProgress";
 export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const [me, settings, access] = await Promise.all([currentMember(), getSettings(), getAccessCtx()]);
+  // Everything the shell needs starts at once: member, settings, access and the sidebar badge (by session id).
+  const uid = await sessionMemberId();
+  const [me, settings, access, mine] = await Promise.all([
+    currentMember(), getSettings(), getAccessCtx(),
+    uid ? query<{ n: number }>(
+      `select count(*)::int as n from permits p join permit_types t on t.id = p.permit_type_id join units u on u.id = p.unit_id
+       where u.status = 'aktif' and p.pic_id = $1 and ((p.expiry_date - (now() at time zone 'Asia/Jakarta')::date) <= t.lead_days or (p.requires_ack and p.ack_at is null))`,
+      [uid],
+    ) : Promise.resolve([] as { n: number }[]),
+  ]);
   if (!me) redirect("/login");
   if (me.must_change_password) redirect("/ganti-password");
   // Sidebar badge: my permits that need action (in renewal window, or somasi not yet acknowledged).
-  const mine = !can(access, me, "permit", "view") ? [] : await query<{ n: number }>(
-    `select count(*)::int as n from permits p join permit_types t on t.id = p.permit_type_id join units u on u.id = p.unit_id
-     where u.status = 'aktif' and p.pic_id = $1 and ((p.expiry_date - (now() at time zone 'Asia/Jakarta')::date) <= t.lead_days or (p.requires_ack and p.ack_at is null))`,
-    [me.id],
-  );
-  const badges = { "/perizinan": { n: mine[0]?.n || 0, hot: true } };
+  const badges = { "/perizinan": { n: can(access, me, "permit", "view") ? mine[0]?.n || 0 : 0, hot: true } };
   const superAdmin = isSuperAdmin(me);
   const allowed = NAV_ITEMS.filter((i) => (i.superAdmin ? superAdmin : i.legal ? isLegal(me) : !i.module || can(access, me, i.module, "view"))).map((i) => i.href);
   const chatOk = can(access, me, "chat", "view");
@@ -32,15 +38,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const userCard = (
     <div className="border-t border-line-2 px-1.5 pt-4">
       <div className="flex items-center gap-2.5">
-        <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-lg bg-ink text-[11.5px] font-bold text-white" aria-hidden="true">{initials(me.name)}</span>
+        <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-lg bg-navy text-[11.5px] font-bold text-white" aria-hidden="true">{initials(me.name)}</span>
         <div className="min-w-0 leading-tight">
           <div className="truncate text-[13px] font-bold">{me.name}</div>
           <div className="truncate text-[11.5px] font-semibold text-ink-3">{roleTitle}</div>
         </div>
       </div>
-      <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
+      <div className="mt-3 grid grid-cols-[1fr_auto_auto] gap-2">
         <form action={logout}><button className="btn btn-sm w-full">Keluar</button></form>
         <a href="/ganti-password" className="btn btn-sm px-2.5" title="Ganti password" aria-label="Ganti password"><KeyRound size={15} /></a>
+        <a href="/" className="btn btn-sm px-2.5" title="Pilih sistem (LDMS / SIGAP)" aria-label="Pilih sistem"><LayoutGrid size={15} /></a>
       </div>
     </div>
   );
@@ -61,8 +68,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen md:flex">
       <aside className="hidden w-[252px] shrink-0 flex-col border-r border-line bg-surface md:sticky md:top-0 md:flex md:h-screen">
-        <a href="/dashboard" className="flex items-center gap-[11px] border-b border-line-2 px-5 pt-[22px] pb-[18px] hover:no-underline">
-          <span className="grid h-9 w-9 place-items-center rounded-[9px] bg-brand text-[14px] font-extrabold tracking-[-0.5px] text-white" aria-hidden="true">BG</span>
+        <a href="/dashboard" className="flex items-center gap-[11px] border-b border-line-2 px-5 pt-[20px] pb-[17px] hover:no-underline">
+          <BrandMark size={36} />
           <span className="leading-tight">
             <span className="block text-[14px] font-extrabold tracking-[-0.3px] text-ink">Legal DMS</span>
             <span className="block text-[11.5px] font-medium text-ink-3">Boga Group</span>
@@ -98,6 +105,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </main>
       </div>
       {chatOk && <ChatWidget name={me.name} />}
+      <CommandPalette allowed={allowed} />
       <NavProgress />
       <Toaster />
     </div>

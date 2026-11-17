@@ -33,6 +33,12 @@ export async function getMember(id: number) {
   return one<Member>(`select id, name, role, email, whatsapp, active, title, nik, must_change_password, password_hash is not null as has_password, last_login_at, is_super_admin, grade, dept, division, perms from team_members where id = $1`, [id]);
 }
 
+/** Member id from the signed session cookie, without a database read (lets pages start queries in parallel). */
+export const sessionMemberId = cache(async (): Promise<number | null> => {
+  const s = await verifySession((await cookies()).get(SESSION_COOKIE)?.value);
+  return s?.m ?? null;
+});
+
 /** The currently signed-in member, or null. Looked up once per request (layout, guards and pages share it). */
 export const currentMember = cache(async (): Promise<Member | null> => {
   const jar = await cookies();

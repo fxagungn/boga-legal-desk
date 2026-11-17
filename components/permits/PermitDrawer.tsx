@@ -111,18 +111,18 @@ export async function PermitDrawer({ code, me, closeHref }: { code: string; me: 
           <section>
             <SectionTitle>Somasi & acknowledge</SectionTitle>
             {p.requires_ack ? (
-              <div className="rounded-xl border border-brand-line bg-brand-subtle p-4">
-                <div className="flex items-center gap-2 text-[12px] font-bold tracking-wider text-brand uppercase"><ShieldAlert size={15} /> Bersomasi</div>
+              <div className="rounded-xl border border-danger-line bg-danger-subtle p-4">
+                <div className="flex items-center gap-2 text-[12px] font-bold tracking-wider text-danger uppercase"><ShieldAlert size={15} /> Bersomasi</div>
                 <p className="mt-2 text-[14px] text-ink">{p.somasi_text}</p>
                 <p className="mt-1 text-[12.5px] text-ink-2">Ditandai {p.somasi_by ?? "—"}{p.somasi_at ? ` · ${formatDateTime(p.somasi_at)}` : ""}</p>
-                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-brand-line pt-3">
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-danger-line pt-3">
                   {needsAck(p) ? (
                     editable ? (
                       <ActionForm action={P.ackSomasiAction} className="contents">
                         <input type="hidden" name="id" value={p.id} />
                         <Submit className="btn btn-primary btn-sm">Acknowledge — saya terima & tindak lanjuti</Submit>
                       </ActionForm>
-                    ) : <span className="text-[13px] font-semibold text-brand">Menunggu acknowledge dari PIC. Masuk antrean reminder somasi harian.</span>
+                    ) : <span className="text-[13px] font-semibold text-danger">Menunggu acknowledge dari PIC. Masuk antrean reminder somasi harian.</span>
                   ) : (
                     <span className="flex items-center gap-1.5 text-[13px] font-semibold text-ok"><BadgeCheck size={15} /> Di-acknowledge {p.ack_by} · {formatDateTime(p.ack_at!)} via {p.ack_via}</span>
                   )}
@@ -240,7 +240,7 @@ function Fact({ label, children, wide }: { label: string; children: React.ReactN
 
 function Banner({ tone, icon: Icon, children }: { tone: "bad" | "warn"; icon: typeof Info; children: React.ReactNode }) {
   return (
-    <div className={cx("flex gap-2.5 rounded-xl border px-4 py-3 text-[13.5px]", tone === "bad" ? "border-brand-line bg-brand-subtle text-brand-deep" : "border-warn/20 bg-warn-bg text-warn")}>
+    <div className={cx("flex gap-2.5 rounded-xl border px-4 py-3 text-[13.5px]", tone === "bad" ? "border-danger-line bg-danger-subtle text-danger-deep" : "border-warn/20 bg-warn-bg text-warn")}>
       <Icon size={17} className="mt-0.5 shrink-0" /><div>{children}</div>
     </div>
   );

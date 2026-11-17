@@ -68,7 +68,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
                       <td className="px-2 py-1.5 text-ink-2">{ACTIONS[a]}</td>
                       {ROLES.map((r) => (
                         <td key={r} className="px-2 py-1.5 text-center">
-                          <input type="checkbox" name={`${m}.${a}.${r}`} defaultChecked={access.matrix[m][a].includes(r)} aria-label={`${MODULES[m]} — ${ACTIONS[a]} — ${ROLE_LABEL[r]}`} className="h-4 w-4 accent-[#c41e29]" />
+                          <input type="checkbox" name={`${m}.${a}.${r}`} defaultChecked={access.matrix[m][a].includes(r)} aria-label={`${MODULES[m]} — ${ACTIONS[a]} — ${ROLE_LABEL[r]}`} className="h-4 w-4 accent-[#1d4ed8]" />
                         </td>
                       ))}
                     </tr>
@@ -93,7 +93,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
             <h2 className="text-[15px] font-extrabold">Claude (Anthropic)</h2>
             <ul className="mt-2 divide-y divide-line-2"><Ok ok={aiKeySet()} sub={aiKeySet() ? "ANTHROPIC_API_KEY terpasang di Vercel." : "Isi ANTHROPIC_API_KEY di Vercel → Settings → Environment Variables, lalu redeploy."}>Kunci API</Ok></ul>
             <ActionForm action={X.saveAiAction} success="Disimpan" className="mt-3 grid gap-3 sm:grid-cols-[auto_1fr_auto] sm:items-end">
-              <label className="flex items-center gap-2 text-[13.5px] font-semibold"><input type="checkbox" name="enabled" defaultChecked={flows.ai.enabled} className="h-4 w-4 accent-[#c41e29]" /> Fitur AI aktif</label>
+              <label className="flex items-center gap-2 text-[13.5px] font-semibold"><input type="checkbox" name="enabled" defaultChecked={flows.ai.enabled} className="h-4 w-4 accent-[#1d4ed8]" /> Fitur AI aktif</label>
               <div><label className="label" htmlFor="ai-m">Model</label>
                 <select id="ai-m" name="model" defaultValue={flows.ai.model} className="input">
                   {["claude-sonnet-5-5", "claude-sonnet-5", "claude-opus-5-5", "claude-haiku-5-5", "claude-sonnet-4-6"].map((m) => <option key={m}>{m}</option>)}
@@ -127,8 +127,8 @@ async function FlowsTab() {
             {sel("corpSupervisorId", "Legal Corporate Supervisor (perjanjian & digest)", flows.reminder.corpSupervisorId, "Supervisor lain")}
           </div>
           <div><label className="label" htmlFor="fl-ag">Titik reminder perjanjian (hari, selain ambang notice)</label><input id="fl-ag" name="agreementStages" defaultValue={flows.reminder.agreementStages.join(", ")} className="input max-w-xs" /></div>
-          <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" name="digestEnabled" defaultChecked={flows.reminder.digestEnabled} className="h-4 w-4 accent-[#c41e29]" /> Weekly digest Senin ke kedua Supervisor</label>
-          <label className="flex items-start gap-2 text-[13.5px]"><input type="checkbox" name="sendEnabled" defaultChecked={flows.reminder.sendEnabled} disabled={!emailChannel()} className="mt-0.5 h-4 w-4 accent-[#c41e29]" />
+          <label className="flex items-center gap-2 text-[13.5px]"><input type="checkbox" name="digestEnabled" defaultChecked={flows.reminder.digestEnabled} className="h-4 w-4 accent-[#1d4ed8]" /> Weekly digest Senin ke kedua Supervisor</label>
+          <label className="flex items-start gap-2 text-[13.5px]"><input type="checkbox" name="sendEnabled" defaultChecked={flows.reminder.sendEnabled} disabled={!emailChannel()} className="mt-0.5 h-4 w-4 accent-[#1d4ed8]" />
             <span><b>Kirim email sungguhan</b><br /><span className="text-[12.5px] text-ink-3">{emailChannel() ? "Kanal email siap. Saat aktif, cron harian mengirim antrean." : "Belum bisa: isi RESEND_API_KEY (dan RESEND_FROM) atau koneksi Microsoft 365 di Vercel dulu. Sampai itu, Reminder Engine berjalan sebagai simulasi."}</span></span></label>
           <div><Submit>Simpan alur reminder</Submit></div>
         </ActionForm>
@@ -249,10 +249,10 @@ async function MasterTab() {
               <ActionForm action={X.saveBrandAction} success="Brand disimpan" className="grid gap-2 sm:grid-cols-[1.2fr_auto_1.4fr_auto_auto_auto] sm:items-center">
                 <input type="hidden" name="id" value={b?.id ?? 0} />
                 <input name="name" defaultValue={b?.name ?? ""} placeholder="Brand baru" aria-label="Nama brand" className="input h-9" />
-                <label className="flex items-center gap-1.5 text-[12.5px]"><input type="checkbox" name="has_principal" defaultChecked={b?.has_principal} className="accent-[#c41e29]" /> Berprincipal</label>
+                <label className="flex items-center gap-1.5 text-[12.5px]"><input type="checkbox" name="has_principal" defaultChecked={b?.has_principal} className="accent-[#1d4ed8]" /> Berprincipal</label>
                 <input name="principal_name" defaultValue={b?.principal_name ?? ""} placeholder="Nama principal" aria-label="Principal" className="input h-9" />
                 <select name="currency" defaultValue={b?.currency ?? "IDR"} aria-label="Mata uang ULA" className="input h-9 w-auto">{["IDR", "USD", "SGD", "JPY"].map((c) => <option key={c}>{c}</option>)}</select>
-                <label className="flex items-center gap-1.5 text-[12.5px]"><input type="checkbox" name="active" defaultChecked={b?.active ?? true} className="accent-[#c41e29]" /> Aktif</label>
+                <label className="flex items-center gap-1.5 text-[12.5px]"><input type="checkbox" name="active" defaultChecked={b?.active ?? true} className="accent-[#1d4ed8]" /> Aktif</label>
                 <Submit className="btn btn-sm">{b ? "Simpan" : "Tambah"}</Submit>
               </ActionForm>
             </li>
@@ -277,7 +277,7 @@ function TypeFields({ t }: { t?: { code: string; name: string; scope: string; le
       <div><label className="label" htmlFor={`pt-a${k}`}>Instansi</label><input id={`pt-a${k}`} name="agency" defaultValue={t?.agency ?? ""} className="input" /></div>
       <div><label className="label" htmlFor={`pt-e${k}`}>Estimasi biaya (Rp)</label><input id={`pt-e${k}`} name="est_cost" inputMode="numeric" defaultValue={t?.est_cost ? Number(t.est_cost).toLocaleString("id-ID") : ""} className="input" /></div>
       <div><label className="label" htmlFor={`pt-b${k}`}>Blocker umum</label><input id={`pt-b${k}`} name="blocker_note" defaultValue={t?.blocker_note ?? ""} className="input" /></div>
-      <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" name="active" defaultChecked={t?.active ?? true} className="accent-[#c41e29]" /> Aktif</label>
+      <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" name="active" defaultChecked={t?.active ?? true} className="accent-[#1d4ed8]" /> Aktif</label>
     </div>
   );
 }
@@ -303,7 +303,7 @@ async function DriveTab() {
         <ActionForm action={X.setupDriveAction} className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
           <div><label className="label" htmlFor="dr-url">Link folder Google Drive</label><input id="dr-url" name="folderUrl" defaultValue={d.folderUrl} required className="input" placeholder="https://drive.google.com/drive/folders/…" /></div>
           <Submit pending="Menyambungkan…">Sambungkan</Submit>
-          <label className="flex items-center gap-2 text-[13px] sm:col-span-2"><input type="checkbox" name="mirrorEnabled" defaultChecked={d.mirrorEnabled} className="accent-[#c41e29]" /> Tulis otomatis setiap perubahan ke LDMS_DB</label>
+          <label className="flex items-center gap-2 text-[13px] sm:col-span-2"><input type="checkbox" name="mirrorEnabled" defaultChecked={d.mirrorEnabled} className="accent-[#1d4ed8]" /> Tulis otomatis setiap perubahan ke LDMS_DB</label>
         </ActionForm>
         <ul className="mt-3 divide-y divide-line-2">
           <Ok ok={googleConfigured()} sub={googleConfigured() ? sa : "Isi GOOGLE_SERVICE_ACCOUNT_JSON di Vercel (dipakai juga untuk sinkron karyawan)."}>Service account Google</Ok>

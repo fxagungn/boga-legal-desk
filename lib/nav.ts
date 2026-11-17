@@ -49,3 +49,8 @@ export function isActive(path: string, href: string) {
 export function navFor(path: string): NavItem | undefined {
   return NAV_ITEMS.find((i) => isActive(path, i.href));
 }
+
+/** Group label (Data Record, Repository …) of the screen at `path`, for the breadcrumb. */
+export function groupFor(path: string): string | null {
+  return NAV.find((g) => g.items.some((i) => isActive(path, i.href)))?.label || null;
+}

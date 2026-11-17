@@ -43,7 +43,7 @@ export const getAgreementByCode = async (code: string) =>
 /** Chip for agreements (§6.3): lewat merah solid · ≤60 merah muda · ≤180 amber · aman abu-hijau. */
 export function agrChip(days: number | null): { text: string; cls: string } {
   if (days === null) return { text: "—", cls: "bg-mute-bg text-ink-2" };
-  if (days < 0) return { text: `Lewat ${-days}h`, cls: "bg-brand text-white" };
+  if (days < 0) return { text: `Lewat ${-days}h`, cls: "bg-danger text-white" };
   if (days <= 60) return { text: `H-${days}`, cls: "bg-[#fde7e9] text-[#a5161f]" };
   if (days <= 180) return { text: `H-${days}`, cls: "bg-[#fff4e2] text-[#8a5a0b]" };
   return { text: `H-${days}`, cls: "bg-[#f0f3f1] text-[#3f5a4d]" };

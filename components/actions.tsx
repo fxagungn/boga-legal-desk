@@ -72,12 +72,15 @@ export function ActionForm({ action, children, className, success, onDone, reset
 }
 
 /** Button that opens a small dialog containing an action form. */
-export function ActionDialog({ action, id, trigger, triggerClass = "btn", title, desc, children, submit, submitClass = "btn btn-primary", success, wide }: {
+export function ActionDialog({ action, id, trigger, triggerClass = "btn", title, desc, children, submit, submitClass = "btn btn-primary", success, wide, autoOpen }: {
   action: Act; id: number; trigger: React.ReactNode; triggerClass?: string; title: string; desc?: string;
   children?: React.ReactNode; submit: string; submitClass?: string; success?: string; wide?: boolean;
+  /** Open on first render (quick actions link here with ?new=1). */
+  autoOpen?: boolean;
 }) {
   const dlg = useRef<HTMLDialogElement>(null);
   const [key, setKey] = useState(0);
+  useEffect(() => { if (autoOpen && !dlg.current?.open) dlg.current?.showModal(); }, [autoOpen]);
   return (
     <>
       <button type="button" className={triggerClass} onClick={() => { setKey((k) => k + 1); dlg.current?.showModal(); }}>{trigger}</button>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AlertTriangle, Plus } from "lucide-react";
 import { redirect } from "next/navigation";
 import { daysText, inWindow, listPermits, needsAck, RENEWAL_LABEL, TIME_CHIP, timeStatus, type PermitRow } from "@/lib/ldms/permits";
 import { listCases } from "@/lib/ldms/cases";
@@ -14,7 +15,7 @@ const urgency = (p: PermitRow) => (needsAck(p) ? -1000 : 0) + (p.days ?? 1e6);
 const isOverdue = (p: PermitRow) => p.days !== null && p.days < 0;
 const due30 = (p: PermitRow) => p.days !== null && p.days >= 0 && p.days <= 30;
 
-export default async function Dashboard({ searchParams }: { searchParams: Promise<{ denied?: string }> }) {
+export default async function Dashboard({ searchParams }: { searchParams: Promise<{ denied?: string; q?: string }> }) {
   const me = (await currentMember())!;
   const access = await getAccessCtx();
   const canView = (m: Parameters<typeof can>[2]) => can(access, me, m, "view");
@@ -37,8 +38,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const compliance = permits.length ? Math.round(((permits.length - overdue.length) / permits.length) * 100) : 100;
 
   const buckets = [
-    { label: "Overdue", t: "overdue", n: overdue.length, fg: "text-brand", bar: "#C41E29" },
-    { label: "≤7 hari", t: "d30", n: permits.filter((p) => p.days !== null && p.days >= 0 && p.days <= 7).length, fg: "text-brand-hover", bar: "#E2606A" },
+    { label: "Overdue", t: "overdue", n: overdue.length, fg: "text-danger", bar: "#C81E1E" },
+    { label: "≤7 hari", t: "d30", n: permits.filter((p) => p.days !== null && p.days >= 0 && p.days <= 7).length, fg: "text-danger-hover", bar: "#E26A6A" },
     { label: "8-30 hari", t: "d30", n: permits.filter((p) => p.days !== null && p.days > 7 && p.days <= 30).length, fg: "text-[#8a5a0b]", bar: "#E9A93C" },
     { label: "31-60 hari", t: "", n: permits.filter((p) => p.days !== null && p.days > 30 && p.days <= 60).length, fg: "text-[#6b5c10]", bar: "#D9CE72" },
     { label: "Aman (>60 hari)", t: "", n: permits.filter((p) => p.days === null || p.days > 60).length, fg: "text-[#3f5a4d]", bar: "#BFCCC4" },
@@ -60,19 +61,50 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
 
   const action = permits.filter((p) => inWindow(p) || needsAck(p)).sort((a, b) => urgency(a) - urgency(b));
 
+  const wib = new Date(Date.now() + 7 * 3600_000);
+  const h = wib.getUTCHours();
+  const greeting = h < 11 ? "Selamat pagi" : h < 15 ? "Selamat siang" : h < 18 ? "Selamat sore" : "Selamat malam";
+  const today = new Intl.DateTimeFormat("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date());
+  const parts = [
+    permitOk && action.length ? `${action.length} izin perlu tindakan` : null,
+    permitOk && overdue.length ? `${overdue.length} sudah kedaluwarsa` : null,
+    openCases.length ? `${openCases.length} case berjalan` : null,
+  ].filter(Boolean);
+  const summary = parts.length ? `Hari ini: ${parts.join(" · ")}.` : "Tidak ada yang mendesak hari ini.";
+  const canEdit = (m: Parameters<typeof can>[2]) => can(access, me, m, "edit");
+  const quick = [
+    permitOk && action.length ? { href: "/perizinan?t=aksi&pic=all", label: "Lihat izin mendesak", icon: <AlertTriangle size={14} />, primary: true } : null,
+    canEdit("cases") ? { href: "/cases?new=1", label: "Case baru", icon: <Plus size={14} />, primary: false } : null,
+    canEdit("inspection") ? { href: "/pemeriksaan?new=1", label: "Catat pemeriksaan", icon: <Plus size={14} />, primary: false } : null,
+  ].filter((x) => x !== null) as { href: string; label: string; icon: React.ReactElement; primary: boolean }[];
+
   return (
     <div className="space-y-5">
       {sp.denied && <p className="rounded-xl border border-warn/20 bg-warn-bg px-4 py-2.5 text-[13px] text-warn">Anda tidak punya akses ke halaman itu.</p>}
-      <GlobalSearch />
+
+      <section className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-[13px] font-medium text-ink-3">{today}</p>
+          <h2 className="mt-0.5 text-[24px] leading-tight font-extrabold tracking-[-0.6px]">{greeting}, {me.name.split(" ")[0]}</h2>
+          <p className="mt-1 text-[13.5px] text-ink-2">{summary}</p>
+        </div>
+        {quick.length > 0 && (
+          <nav className="flex flex-wrap gap-2" aria-label="Aksi cepat">
+            {quick.map((x) => <Link key={x.href} href={x.href} className={cx("btn btn-sm", x.primary && "btn-primary")}>{x.icon}{x.label}</Link>)}
+          </nav>
+        )}
+      </section>
+
+      <GlobalSearch initialQuery={sp.q ?? ""} />
 
       {(permitOk || canView("cases")) && (
         <section className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="Ringkasan">
           {permitOk && <>
-            <Kpi dot="bg-brand" label="Kedaluwarsa" value={overdue.length} tone="text-brand" href="/perizinan?t=overdue&pic=all" />
+            <Kpi dot="bg-danger" label="Kedaluwarsa" value={overdue.length} tone="text-danger" href="/perizinan?t=overdue&pic=all" />
             <Kpi dot="bg-[#e9a93c]" label="≤30 hari" value={soon.length} href="/perizinan?t=d30&pic=all" />
             <Kpi dot="bg-ok" label="Compliance" value={`${compliance}%`} href="/perizinan?pic=all" />
           </>}
-          {canView("cases") ? <Kpi dot="bg-ink" label="Case aktif" value={openCases.length} tone={openCases.some((c) => c.risk === "Tinggi") ? "text-brand" : undefined} href="/cases" />
+          {canView("cases") ? <Kpi dot="bg-ink" label="Case aktif" value={openCases.length} tone={openCases.some((c) => c.risk === "Tinggi") ? "text-danger" : undefined} href="/cases" />
             : permitOk && <Kpi dot="bg-ink" label="Somasi di-ack" value={`${acked.length}/${ackNeeded.length}`} href="/perizinan?t=somasi&pic=all" />}
         </section>
       )}
@@ -102,9 +134,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                   <Link href={`/perizinan?pic=all&brand=${encodeURIComponent(["Central Kitchen", "Korporat"].includes(b.name) ? "—" : b.name)}`} className="group block hover:no-underline">
                     <div className="flex items-baseline justify-between text-[13px]">
                       <span className="font-semibold text-ink group-hover:text-brand">{b.name}</span>
-                      <span className={cx("font-mono text-[12px] font-semibold", b.pct >= 95 ? "text-ok" : "text-brand")}>{b.pct}%</span>
+                      <span className={cx("font-mono text-[12px] font-semibold", b.pct >= 95 ? "text-ok" : b.pct >= 85 ? "text-[#8a5a0b]" : "text-danger")}>{b.pct}%</span>
                     </div>
-                    <div className="mt-1.5 h-[5px] overflow-hidden rounded-full bg-mute-bg"><div className={cx("h-full rounded-full", b.pct >= 95 ? "bg-ok" : "bg-brand")} style={{ width: `${b.pct}%` }} /></div>
+                    <div className="mt-1.5 h-[5px] overflow-hidden rounded-full bg-mute-bg"><div className={cx("h-full rounded-full", b.pct >= 95 ? "bg-ok" : b.pct >= 85 ? "bg-[#e9a93c]" : "bg-danger")} style={{ width: `${b.pct}%` }} /></div>
                   </Link>
                 </li>
               ))}

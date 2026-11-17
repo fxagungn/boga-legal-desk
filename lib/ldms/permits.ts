@@ -27,8 +27,8 @@ export const TIME_LABEL: Record<TimeStatus, string> = {
 
 /** Chip colours (LDMS design): overdue/today solid red · ≤7 pink · ≤30 amber · ≤60 yellow · safe grey-green. */
 export const TIME_CHIP: Record<TimeStatus, string> = {
-  overdue: "bg-brand text-white",
-  today: "bg-brand text-white",
+  overdue: "bg-danger text-white",
+  today: "bg-danger text-white",
   d7: "bg-[#fde7e9] text-[#a5161f]",
   d30: "bg-[#fff4e2] text-[#8a5a0b]",
   d60: "bg-[#fffbe8] text-[#6b5c10]",

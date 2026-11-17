@@ -81,9 +81,9 @@ export async function TeamSystem({ tab, preview }: { tab: Tab; preview: boolean 
                       <div><label className="label">WhatsApp</label><input name="whatsapp" defaultValue={m.whatsapp ?? ""} className="input h-9" placeholder="0812…" disabled={!lead} /></div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <label className="flex items-center gap-1.5 text-[13px] text-ink-2"><input type="checkbox" name="active" defaultChecked={m.active} disabled={!lead} className="accent-[#c41e29]" /> Aktif</label>
+                      <label className="flex items-center gap-1.5 text-[13px] text-ink-2"><input type="checkbox" name="active" defaultChecked={m.active} disabled={!lead} className="accent-[#1d4ed8]" /> Aktif</label>
                       <input type="hidden" name="sa_present" value="1" />
-                      <label className="flex items-center gap-1.5 text-[13px] text-ink-2" title="Super Admin mengatur akses, peran, alur, dan integrasi"><input type="checkbox" name="is_super_admin" defaultChecked={Boolean(m.is_super_admin)} disabled={!lead} className="accent-[#c41e29]" /> Super Admin</label>
+                      <label className="flex items-center gap-1.5 text-[13px] text-ink-2" title="Super Admin mengatur akses, peran, alur, dan integrasi"><input type="checkbox" name="is_super_admin" defaultChecked={Boolean(m.is_super_admin)} disabled={!lead} className="accent-[#1d4ed8]" /> Super Admin</label>
                       {lead && <Submit className="btn btn-sm">Simpan</Submit>}
                     </div>
                   </ActionForm>

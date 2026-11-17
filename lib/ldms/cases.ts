@@ -29,7 +29,7 @@ export type CaseStatus = keyof typeof CASE_STATUS;
 export const STATUS_CHIP: Record<CaseStatus, string> = {
   baru: "bg-info-bg text-info", investigasi: "bg-[#fff4e2] text-[#8a5a0b]", proses: "bg-brand-soft text-brand", selesai: "bg-ok-bg text-ok",
 };
-export const RISK_CHIP: Record<string, string> = { Rendah: "bg-mute-bg text-ink-2", Sedang: "bg-[#fff4e2] text-[#8a5a0b]", Tinggi: "bg-brand text-white" };
+export const RISK_CHIP: Record<string, string> = { Rendah: "bg-mute-bg text-ink-2", Sedang: "bg-[#fff4e2] text-[#8a5a0b]", Tinggi: "bg-danger text-white" };
 
 /** Stages of the handling flow (best practice: intake → fact finding → BA → escalation → resolution → closing). */
 export const STAGES = ["Laporan diterima", "Investigasi & pengumpulan bukti", "Berita Acara", "Eskalasi", "Negosiasi / mediasi", "Proses hukum", "Keputusan", "Penutupan"];

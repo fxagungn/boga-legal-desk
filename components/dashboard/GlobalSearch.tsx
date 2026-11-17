@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { cx } from "@/components/ui";
 import { Loader2, Search } from "lucide-react";
@@ -26,8 +26,8 @@ function match(r: SearchRow, s: Status) {
 
 function chip(d: number | null) {
   if (d === null) return null;
-  if (d < 0) return { t: `Overdue ${-d}h`, c: "bg-brand text-white" };
-  if (d === 0) return { t: "Hari ini", c: "bg-brand text-white" };
+  if (d < 0) return { t: `Overdue ${-d}h`, c: "bg-danger text-white" };
+  if (d === 0) return { t: "Hari ini", c: "bg-danger text-white" };
   if (d <= 7) return { t: `H-${d}`, c: "bg-[#fde7e9] text-[#a5161f]" };
   if (d <= 30) return { t: `H-${d}`, c: "bg-[#fff4e2] text-[#8a5a0b]" };
   if (d <= 60) return { t: `H-${d}`, c: "bg-[#fffbe8] text-[#6b5c10]" };
@@ -35,16 +35,17 @@ function chip(d: number | null) {
 }
 
 /** Dashboard search across every LDMS module (blueprint §12.1). Most urgent first, max 60. */
-export function GlobalSearch() {
+export function GlobalSearch({ initialQuery = "" }: { initialQuery?: string }) {
   // Rows are loaded on first use, so opening the dashboard does not read every module.
   const [rows, setRows] = useState<SearchRow[] | null>(null);
   const asked = useRef(false);
+  useEffect(() => { if (initialQuery) load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   const load = () => {
     if (asked.current) return;
     asked.current = true;
     searchRowsAction().then(setRows).catch(() => { asked.current = false; });
   };
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initialQuery);
   const [modul, setModul] = useState<(typeof MODULES)[number]>("Semua modul");
   const [status, setStatus] = useState<Status>("Semua status");
 
@@ -94,7 +95,7 @@ export function GlobalSearch() {
                     <span className="block truncate text-[13px] font-bold text-ink">{r.title}</span>
                     <span className="block truncate text-[11.5px] text-ink-3">{r.sub}</span>
                   </span>
-                  {r.noAck && <span className="hidden rounded-md bg-brand-soft px-1.5 py-px text-[11px] font-bold text-brand sm:inline">Belum ack</span>}
+                  {r.noAck && <span className="hidden rounded-md bg-danger-soft px-1.5 py-px text-[11px] font-bold text-danger sm:inline">Belum ack</span>}
                   {c && <span className={cx("shrink-0 rounded-md px-2 py-[3px] font-mono text-[11px] font-semibold whitespace-nowrap", c.c)}>{c.t}</span>}
                 </Link>
               </li>

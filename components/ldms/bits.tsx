@@ -35,7 +35,7 @@ export function Fact({ label, children, wide }: { label: string; children: React
 }
 
 export function Banner({ tone, icon: Icon, children }: { tone: "bad" | "warn" | "info" | "ok"; icon?: LucideIcon; children: React.ReactNode }) {
-  const t = { bad: "border-brand-line bg-brand-subtle text-brand-deep", warn: "border-warn/20 bg-warn-bg text-warn", info: "border-info/20 bg-info-bg text-info", ok: "border-ok/20 bg-ok-bg text-ok" }[tone];
+  const t = { bad: "border-danger-line bg-danger-subtle text-danger-deep", warn: "border-warn/20 bg-warn-bg text-warn", info: "border-info/20 bg-info-bg text-info", ok: "border-ok/20 bg-ok-bg text-ok" }[tone];
   return (
     <div className={cx("flex gap-2.5 rounded-xl border px-4 py-3 text-[13px] leading-relaxed", t)}>
       {Icon && <Icon size={17} className="mt-0.5 shrink-0" />}<div className="min-w-0">{children}</div>

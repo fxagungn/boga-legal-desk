@@ -66,7 +66,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ k
               <tbody className="divide-y divide-line-2">
                 {jobs.map((j) => (
                   <tr key={j.key} className={cx("group relative hover:bg-[#fafbfc]", sel?.key === j.key && "bg-brand-subtle", j.sent && "opacity-60")}>
-                    <td className="px-5 py-2.5"><MonoChip cls={j.stage === "OVERDUE" || j.stage === "H-0" || j.stage === "SOMASI" ? "bg-brand text-white" : "bg-[#fff4e2] text-[#8a5a0b]"}>{j.stage}</MonoChip>{j.sent && <span className="ml-1 text-[11px] text-ok">terkirim</span>}</td>
+                    <td className="px-5 py-2.5"><MonoChip cls={j.stage === "OVERDUE" || j.stage === "H-0" || j.stage === "SOMASI" ? "bg-danger text-white" : "bg-[#fff4e2] text-[#8a5a0b]"}>{j.stage}</MonoChip>{j.sent && <span className="ml-1 text-[11px] text-ok">terkirim</span>}</td>
                     <td className="px-3 py-2.5"><Link href={`/reminder?k=${encodeURIComponent(j.key)}`} scroll={false} className="font-semibold text-ink after:absolute after:inset-0 hover:no-underline">{j.code} · {j.title}</Link><div className="text-[11.5px] text-ink-3">{j.unit}</div></td>
                     <td className="px-3 py-2.5">{j.to?.name ?? <span className="text-bad">PIC kosong</span>}{j.to && !j.to.email && <div className="text-[11px] text-bad">email belum diisi</div>}</td>
                     <td className="px-3 py-2.5 text-[12px] text-ink-2">{j.cc.map((c) => c.name.split(" ")[0]).join(", ") || "—"}</td>

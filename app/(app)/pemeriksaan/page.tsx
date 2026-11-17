@@ -16,7 +16,7 @@ import { saveInspectionAction } from "@/app/ldms-actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function Page({ searchParams }: { searchParams: Promise<{ d?: string; ai?: string; q?: string }> }) {
+export default async function Page({ searchParams }: { searchParams: Promise<{ d?: string; ai?: string; q?: string; new?: string }> }) {
   const { me, can } = await pageGuard("inspection");
   const sp = await searchParams;
   const [all, units, members, ready] = await Promise.all([listInspections(), listUnits(), listMembers(true), aiReady()]);
@@ -38,7 +38,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
         </form>
         <Link href={href({ ai: sp.ai ? undefined : "1", d: undefined })} scroll={false} className={cx("btn", sp.ai && "border-brand-line bg-brand-subtle text-brand")}><Sparkles size={15} /> Siapkan pemeriksaan</Link>
         {can("inspection", "edit") && (
-          <ActionDialog action={saveInspectionAction} id={0} wide trigger={<><Plus size={16} /> Catat</>} triggerClass="btn btn-primary" title="Catat pemeriksaan" submit="Simpan">
+          <ActionDialog action={saveInspectionAction} id={0} wide autoOpen={sp.new === "1"} trigger={<><Plus size={16} /> Catat</>} triggerClass="btn btn-primary" title="Catat pemeriksaan" submit="Simpan">
             <InspectionFields units={units} members={members} meId={me.id} />
           </ActionDialog>
         )}

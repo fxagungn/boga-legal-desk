@@ -259,18 +259,28 @@ export async function saveSettings(patch: Partial<AppSettings>) {
   return next;
 }
 
-// Settings (access matrix, cohorts, flows …) are read on every page. Keep them in memory for a few seconds per
-// server instance so a page load does not pay one database round trip per setting. Writes clear the entry at once.
+// Settings (access matrix, cohorts, flows, app …) are read on every page. The whole table is small, so it is loaded
+// in ONE round trip and kept in memory for a few seconds per server instance. Writes refresh it at once.
 const KV_TTL = 15_000;
-const kvCache = new Map<string, { at: number; value: unknown }>();
+let kvAll: { at: number; map: Map<string, unknown> } | null = null;
+let kvLoading: Promise<Map<string, unknown>> | null = null;
+
+async function loadKv(): Promise<Map<string, unknown>> {
+  if (kvAll && Date.now() - kvAll.at < KV_TTL) return kvAll.map;
+  if (!kvLoading) {
+    kvLoading = query<{ key: string; value: unknown }>(`select key, value from app_settings`)
+      .then((rows) => {
+        const map = new Map(rows.map((r) => [r.key, r.value]));
+        kvAll = { at: Date.now(), map };
+        return map;
+      })
+      .finally(() => { kvLoading = null; });
+  }
+  return kvLoading;
+}
 
 export async function getKV<T>(key: string): Promise<T | null> {
-  const hit = kvCache.get(key);
-  if (hit && Date.now() - hit.at < KV_TTL) return hit.value as T | null;
-  const row = await one<{ value: T }>(`select value from app_settings where key = $1`, [key]);
-  const value = row?.value ?? null;
-  kvCache.set(key, { at: Date.now(), value });
-  return value;
+  return ((await loadKv()).get(key) as T | undefined) ?? null;
 }
 
 export async function setKV(key: string, value: unknown) {
@@ -279,7 +289,7 @@ export async function setKV(key: string, value: unknown) {
      on conflict (key) do update set value = excluded.value, updated_at = now()`,
     [key, JSON.stringify(value)],
   );
-  kvCache.delete(key);
+  kvAll = null;
 }
 
 /* ---------- seed ---------- */

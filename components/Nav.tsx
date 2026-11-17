@@ -2,8 +2,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FolderKanban, LayoutDashboard, Menu, ShieldCheck, X } from "lucide-react";
-import { isActive, NAV, NAV_ITEMS, navFor } from "@/lib/nav";
+import { FolderKanban, LayoutDashboard, Menu, Search, ShieldCheck, X } from "lucide-react";
+import { groupFor, isActive, NAV, NAV_ITEMS, navFor } from "@/lib/nav";
+import { openPalette } from "./CommandPalette";
+import { BrandMark } from "./BrandMark";
 import { cx } from "./ui";
 
 export function SideNav({ badges = {}, allowed, onNavigate }: { badges?: Record<string, { n: number; hot?: boolean }>; allowed: string[]; onNavigate?: () => void }) {
@@ -27,7 +29,7 @@ export function SideNav({ badges = {}, allowed, onNavigate }: { badges?: Record<
                 <span className="min-w-0 flex-1 leading-snug">{it.label}</span>
                 {it.note && <span className="rounded-[5px] bg-[#fff4e2] px-1.5 py-px text-[10px] font-bold whitespace-nowrap text-[#8a5a0b]">{it.note}</span>}
                 {b && b.n > 0 ? (
-                  <span className={cx("rounded-[5px] px-1.5 py-px font-mono text-[10.5px] font-semibold", b.hot ? "bg-brand-soft text-brand" : "bg-mute-bg text-ink-2")}>{b.n}</span>
+                  <span className={cx("rounded-[5px] px-1.5 py-px font-mono text-[10.5px] font-semibold", b.hot ? "bg-danger-soft text-danger" : "bg-mute-bg text-ink-2")}>{b.n}</span>
                 ) : null}
               </Link>
             );
@@ -38,24 +40,25 @@ export function SideNav({ badges = {}, allowed, onNavigate }: { badges?: Record<
   );
 }
 
-/** Page title strip at the top of every screen (design: title + sub on the left, date and user on the right). */
+/** Top bar: breadcrumb + title on the left, quick search (⌘K) and the user on the right. */
 export function TopBar({ name, title, initials }: { name: string; title: string; initials: string }) {
   const path = usePathname();
   const it = navFor(path);
-  const today = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date());
+  const group = groupFor(path);
   return (
-    <header className="hidden items-center justify-between gap-6 border-b border-line bg-surface px-7 py-4 md:flex">
+    <header className="sticky top-0 z-30 hidden items-center justify-between gap-6 border-b border-line bg-surface/90 px-7 py-3.5 backdrop-blur md:flex">
       <div className="min-w-0">
-        <h1 className="flex items-center gap-2.5 text-[19px] font-extrabold tracking-[-0.35px]">{it?.title ?? "Legal DMS"}{it?.note && <span className="rounded-md bg-[#fff4e2] px-2 py-0.5 text-[11px] font-bold tracking-normal text-[#8a5a0b]">{it.note}</span>}</h1>
+        {group && <div className="text-[11.5px] font-semibold tracking-[0.4px] text-ink-3 uppercase">{group}</div>}
+        <h1 className="truncate text-[18px] leading-tight font-extrabold tracking-[-0.35px]">{it?.title ?? "Legal DMS"}</h1>
       </div>
       <div className="flex shrink-0 items-center gap-4">
-        <div className="text-right">
-          <div className="text-[11px] font-medium text-ink-3">Hari ini</div>
-          <div className="font-mono text-[13px] font-semibold">{today}</div>
-        </div>
+        <button type="button" onClick={openPalette} className="flex h-9 w-[260px] items-center gap-2.5 rounded-lg border border-line bg-bg px-3 text-[13px] text-ink-3 transition-colors hover:border-brand-line hover:text-ink-2 lg:w-[300px]">
+          <Search size={15} aria-hidden="true" /> <span className="flex-1 text-left">Cari menu atau dokumen…</span>
+          <kbd className="rounded border border-line bg-surface px-1.5 font-mono text-[10.5px]">Ctrl K</kbd>
+        </button>
         <span className="h-8 w-px bg-line" aria-hidden="true" />
         <div className="flex items-center gap-2.5">
-          <span className="grid h-8 w-8 place-items-center rounded-full bg-ink text-[12px] font-bold text-white" aria-hidden="true">{initials}</span>
+          <span className="grid h-8 w-8 place-items-center rounded-full bg-navy text-[12px] font-bold text-white" aria-hidden="true">{initials}</span>
           <div className="leading-tight">
             <div className="text-[13px] font-bold">{name}</div>
             <div className="text-[11.5px] text-ink-3">{title}</div>
@@ -74,18 +77,19 @@ export function MobileNav({ badges = {}, allowed, footer }: { badges?: Record<st
   const it = navFor(path);
   const tabs = ([
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/perizinan", label: "Registry", icon: ShieldCheck },
+    { href: "/perizinan", label: "Permit", icon: ShieldCheck },
     { href: "/cases", label: "Cases", icon: FolderKanban },
   ]).filter((t) => allowed.includes(t.href));
   return (
     <>
       <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-surface/95 px-4 py-3 backdrop-blur md:hidden">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-brand text-[13px] font-extrabold tracking-[-0.5px] text-white" aria-hidden="true">BG</span>
+        <BrandMark size={32} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[15px] font-extrabold tracking-[-0.3px]">{it?.title ?? "Legal DMS"}</div>
           <div className="truncate text-[11.5px] text-ink-3">Legal DMS · Boga Group</div>
         </div>
-        <button type="button" className="btn btn-ghost btn-sm px-2" aria-label="Buka menu" aria-expanded={open} onClick={() => setOpen(true)}><Menu size={20} /></button>
+        <button type="button" className="btn btn-ghost h-10 w-10 px-0" aria-label="Cari menu atau dokumen" onClick={openPalette}><Search size={19} /></button>
+        <button type="button" className="btn btn-ghost h-10 w-10 px-0" aria-label="Buka menu" aria-expanded={open} onClick={() => setOpen(true)}><Menu size={20} /></button>
       </header>
 
       {open && (
@@ -110,7 +114,7 @@ export function MobileNav({ badges = {}, allowed, footer }: { badges?: Record<st
             <Link key={href} href={href} className={cx("relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[11.5px] font-semibold", on ? "text-brand" : "text-ink-3")}>
               <Icon size={21} strokeWidth={on ? 2.4 : 2} />
               {label}
-              {n ? <span className="absolute top-1 left-1/2 ml-2 rounded-full bg-brand px-1 font-mono text-[10px] leading-4 font-bold text-white">{n}</span> : null}
+              {n ? <span className="absolute top-1 left-1/2 ml-2 rounded-full bg-danger px-1 font-mono text-[10px] leading-4 font-bold text-white">{n}</span> : null}
             </Link>
           );
         })}

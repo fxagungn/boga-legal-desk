@@ -51,12 +51,12 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ t
     <div className="space-y-4">
       <section className="grid grid-cols-3 gap-3">
         <Kpi label="MLA aktif" value={active.filter((a) => a.kind === "MLA").length} />
-        <Kpi label="ULA berlaku" value={ulaOk} unit={`/ ${principalOutlets}`} tone={ulaOk < principalOutlets ? "text-brand" : "text-ok"} />
-        <Kpi label="Berakhir ≤90 hari" value={ending90} tone={ending90 ? "text-brand" : undefined} />
+        <Kpi label="ULA berlaku" value={ulaOk} unit={`/ ${principalOutlets}`} tone={ulaOk < principalOutlets ? "text-danger" : "text-ok"} />
+        <Kpi label="Berakhir ≤90 hari" value={ending90} tone={ending90 ? "text-danger" : undefined} />
       </section>
 
       {alerts.length > 0 && (
-        <details className="group rounded-xl border border-brand-line bg-brand-subtle px-4 py-3 text-[13px] text-brand-deep">
+        <details className="group rounded-xl border border-danger-line bg-danger-subtle px-4 py-3 text-[13px] text-danger-deep">
           <summary className="flex cursor-pointer list-none items-center gap-2 font-semibold"><AlertTriangle size={16} /> {alerts.length} peringatan validator <span className="ml-auto text-[12px] font-normal group-open:hidden">Lihat</span></summary>
           <ul className="mt-2 list-disc space-y-0.5 pl-5">{alerts.map((x, i) => <li key={i}>{x.text}</li>)}</ul>
         </details>

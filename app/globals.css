@@ -103,11 +103,27 @@ dialog[open] { animation: pop .14s ease-out; }
     radial-gradient(700px 420px at -10% 110%, rgb(14 106 143 / 0.08), transparent 60%),
     #ffffff;
 }
-.portal-grid {
-  background-image: linear-gradient(rgb(15 23 42 / 0.045) 1px, transparent 1px), linear-gradient(90deg, rgb(15 23 42 / 0.045) 1px, transparent 1px);
-  background-size: 44px 44px;
-  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 30%, transparent 75%);
-}
+/* Legal motif (components/LegalVisual.tsx) and animated brand mark */
+.lv * { transform-box: view-box; }
+@keyframes lv-spin { to { transform: rotate(360deg); } }
+@keyframes lv-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
+@keyframes lv-sway { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg); } }
+@keyframes lv-flow { to { stroke-dashoffset: -160; } }
+@keyframes lv-pulse { 0%, 100% { opacity: .75; } 50% { opacity: 1; } }
+.lv-spin { animation: lv-spin 90s linear infinite; }
+.lv-spin-rev { animation: lv-spin 140s linear infinite reverse; }
+.lv-float { animation: lv-float 9s ease-in-out infinite; }
+.lv-float-2 { animation-duration: 11s; animation-delay: -3s; }
+.lv-float-3 { animation-duration: 13s; animation-delay: -6s; }
+.lv-sway { transform-origin: 0px -40px; animation: lv-sway 7s ease-in-out infinite; }
+.lv-flow { animation: lv-flow 6s linear infinite; }
+.lv-flow-2 { animation-duration: 7.5s; } .lv-flow-3 { animation-duration: 9s; }
+.lv-pulse { animation: lv-pulse 8s ease-in-out infinite; }
+.brand-mark svg * { transform-box: view-box; }
+.brand-mark-anim .bm-beam { transform-origin: 20px 14.2px; animation: lv-sway 6s ease-in-out infinite; }
+.brand-mark-anim .bm-ring { transform-origin: 20px 20px; animation: lv-spin 40s linear infinite; }
+.portal-hero-mask { mask-image: radial-gradient(ellipse 75% 70% at 50% 40%, #000 35%, transparent 80%); }
+@media (prefers-reduced-motion: reduce) { .lv *, .brand-mark * { animation: none !important; } }
 .portal-card { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
 .portal-card:hover { transform: translateY(-2px); box-shadow: 0 18px 40px -16px rgba(15, 23, 42, 0.22); }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }

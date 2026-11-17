@@ -3,6 +3,7 @@ import { hasDb } from "@/lib/db";
 import { getFlows, SIGAP_URL } from "@/lib/flows";
 import { currentMember } from "@/lib/repo";
 import { BrandMark } from "@/components/BrandMark";
+import { LegalVisual } from "@/components/LegalVisual";
 
 export const dynamic = "force-dynamic";
 
@@ -26,11 +27,11 @@ export default async function Portal() {
 
   return (
     <div className="portal-bg relative flex min-h-screen flex-col overflow-hidden">
-      <div className="portal-grid pointer-events-none absolute inset-0" aria-hidden="true" />
+      <div className="portal-hero-mask pointer-events-none absolute inset-x-0 top-0 h-[720px] opacity-90" aria-hidden="true"><LegalVisual className="h-full w-full" /></div>
 
       <header className="relative mx-auto flex w-full max-w-[1120px] items-center justify-between px-5 pt-6 md:px-8">
         <div className="flex items-center gap-3">
-          <BrandMark size={38} />
+          <BrandMark size={38} animated />
           <div className="leading-tight">
             <div className="text-[15px] font-extrabold tracking-[-0.3px] text-ink">Boga Group</div>
             <div className="text-[12px] font-medium text-ink-3">Legal Department</div>
@@ -42,12 +43,12 @@ export default async function Portal() {
       <main className="relative mx-auto w-full max-w-[1120px] flex-1 px-5 pt-14 pb-16 md:px-8 md:pt-20">
         <div className="rise mx-auto max-w-[640px] text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-brand-line bg-white/80 px-3 py-1 text-[12px] font-semibold text-brand-deep backdrop-blur">
-            <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden="true" /> Portal Legal
+            <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden="true" /> Legal Department
           </span>
           <h1 className="mt-5 text-[34px] leading-[1.12] font-extrabold tracking-[-1.1px] text-balance text-ink md:text-[46px]">
-            Satu pintu untuk urusan legal <span className="text-brand">Boga Group</span>
+            Sistem Legal <span className="text-brand">Boga Group</span>
           </h1>
-          <p className="mx-auto mt-4 max-w-[520px] text-[15.5px] leading-relaxed text-ink-2">Pilih sistem yang ingin Anda buka.</p>
+          <p className="mx-auto mt-4 max-w-[520px] text-[15.5px] leading-relaxed text-ink-2">Akses dokumen, kepatuhan, dan penanganan kasus perusahaan. Pilih sistem untuk melanjutkan.</p>
         </div>
 
         <div className="mx-auto mt-12 grid max-w-[920px] gap-5 md:grid-cols-2">

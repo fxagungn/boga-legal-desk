@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ArrowLeft, BookOpenCheck, FileText, FolderKanban, ShieldCheck } from "lucide-react";
 import { getSettings, hasDb } from "@/lib/db";
 import { BrandMark } from "@/components/BrandMark";
+import { LegalVisual } from "@/components/LegalVisual";
 import { LoginForm } from "./LoginForm";
 
 export const dynamic = "force-dynamic";
@@ -21,11 +22,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <div className="grid min-h-screen bg-white lg:grid-cols-[1.05fr_1fr]">
       <aside className="relative hidden overflow-hidden bg-gradient-to-br from-navy via-[#12306f] to-brand-deep text-white lg:flex lg:flex-col">
-        <div className="pointer-events-none absolute inset-0 opacity-[0.12] [background-image:linear-gradient(rgb(255_255_255/0.5)_1px,transparent_1px),linear-gradient(90deg,rgb(255_255_255/0.5)_1px,transparent_1px)] [background-size:44px_44px]" aria-hidden="true" />
+        <LegalVisual tone="dark" className="absolute top-[4%] -left-[10%] h-auto w-[120%] opacity-90 [mask-image:linear-gradient(to_bottom,#000_50%,transparent_88%)]" />
         <div className="pointer-events-none absolute -top-40 -right-40 h-[480px] w-[480px] rounded-full bg-brand/40 blur-3xl" aria-hidden="true" />
         <div className="relative flex flex-1 flex-col px-12 py-10 xl:px-16">
           <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-[11px] bg-white/12 text-[15px] font-extrabold ring-1 ring-white/25 backdrop-blur" aria-hidden="true">BG</span>
+            <BrandMark size={40} tone="glass" animated />
             <div className="leading-tight"><div className="text-[15px] font-extrabold">Boga Group</div><div className="text-[12px] text-white/70">Legal Department</div></div>
           </div>
           <div className="mt-auto max-w-[460px]">

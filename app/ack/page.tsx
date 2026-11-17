@@ -1,3 +1,4 @@
+import { BrandMark } from "@/components/BrandMark";
 // Acknowledge a somasi from the reminder email (blueprint §14.5). Signed link: permit + member + HMAC.
 import { query } from "@/lib/db";
 import { getPermit, audit } from "@/lib/ldms/permits";
@@ -26,7 +27,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
   return (
     <div className="flex min-h-screen items-center justify-center bg-bg px-5">
       <div className="w-full max-w-[460px] rounded-[14px] border border-line bg-surface p-6 text-center">
-        <span className="mx-auto grid h-11 w-11 place-items-center rounded-[11px] bg-brand text-[16px] font-extrabold text-white" aria-hidden="true">BG</span>
+        <span className="mx-auto block w-fit"><BrandMark size={44} /></span>
         <h1 className="mt-4 text-[17px] font-extrabold">{ok ? "Acknowledge tercatat" : "Tidak bisa diproses"}</h1>
         <p className="mt-2 text-[13.5px] text-ink-2">{msg}</p>
         <a href="/dashboard" className="btn btn-primary mt-5">Buka LDMS</a>
